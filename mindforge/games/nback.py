@@ -256,7 +256,7 @@ class NBackGame(GameWidget):
             ["Пропуски", str(sp["misses"] + (ss["misses"] if ss else 0))],
             ["Ложные нажатия", str(sp["fa"] + (ss["fa"] if ss else 0))],
         ]
-        verdict = "N повышен!" if nl > self.n else ("N понижен" if nl < self.n else "N остаётся прежним")
+        verdict = "N повышен!" if nl > self.n else ("N понижен." if nl < self.n else "N остаётся прежним.")
         self.finish(
             GameResult(
                 game=self.game_id,
@@ -273,7 +273,7 @@ class NBackGame(GameWidget):
                     "trials": len(self.trials) - self.n,
                     "headline": f"{self.n}-назад · {round(acc * 100)}%",
                     "rows": rows,
-                    "note": verdict + (". " + self.note if self.note else ""),
+                    "note": verdict + (" " + self.note if self.note else ""),
                 },
             )
         )

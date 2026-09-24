@@ -116,13 +116,18 @@ def main() -> None:
         win.host.start_game()
         pump(app, 2900 + shots[gid])
         game = win.host.game
-        if gid == "nback":
+        if gid == "nback" and game is not None:
             game.respond("pos")
             pump(app, 50)
         win.grab().save(str(out / f"game-{gid}{sfx}.png"))
         if gid == games[0] and game is not None:
+            if gid == "nback":  # правдоподобный результат: почти все совпадения найдены
+                game.resp_pos = [t["pos_match"] for t in game.trials]
+                game.resp_snd = [t["snd_match"] for t in game.trials]
+                miss = next(i for i, t in enumerate(game.trials) if t["snd_match"])
+                game.resp_snd[miss] = False
             game.force_finish()
-            pump(app, 700)
+            pump(app, 5200)  # ждём, пока исчезнут всплывающие уведомления
             win.grab().save(str(out / f"result-{gid}{sfx}.png"))
         win.host.close_host()
         pump(app, 100)

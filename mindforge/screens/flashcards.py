@@ -170,7 +170,13 @@ class BrowseDialog(Dialog):
         rows = sorted({i.row() for i in self.table.selectedIndexes()})
         if not rows:
             return
-        if QMessageBox.question(self, "Удалить", f"Удалить карточек: {len(rows)}?") != QMessageBox.StandardButton.Yes:
+        box = QMessageBox(self)
+        box.setWindowTitle("Удалить карточки")
+        box.setText(f"Удалить карточек: {len(rows)}?")
+        yes = box.addButton("Удалить", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is not yes:
             return
         for r in rows:
             self.ctx.storage.delete_card(self.cards[r]["id"])

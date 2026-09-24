@@ -305,10 +305,19 @@ def set_dark_titlebar(window: QWidget, dark: bool) -> None:
         pass
 
 
-def _install_excepthook() -> None:
+def _install_excepthook(log_dir: str | None = None) -> None:
     def hook(exc_type, exc, tb):
         text = "".join(traceback.format_exception(exc_type, exc, tb))
-        sys.stderr.write(text)
+        if sys.stderr is not None:
+            sys.stderr.write(text)
+        if log_dir:
+            try:
+                from datetime import datetime
+
+                with open(os.path.join(log_dir, "error.log"), "a", encoding="utf-8") as f:
+                    f.write(f"--- {datetime.now():%Y-%m-%d %H:%M:%S} v{__version__}\n{text}\n")
+            except OSError:
+                pass
         app = QApplication.instance()
         if app is not None and not os.environ.get("MINDFORGE_SELFTEST"):
             box = QMessageBox()
@@ -334,19 +343,39 @@ def create_app(argv: list[str] | None = None) -> QApplication:
     app.setApplicationVersion(__version__)
     app.setWindowIcon(app_icon())
     app.setFont(font(10))
+    _load_translations(app)
     return app
+
+
+def _load_translations(app: QApplication) -> None:
+    """Русские подписи стандартных кнопок Qt (OK/Отмена и т.п.)."""
+    try:
+        from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+
+        tr = QTranslator(app)
+        if tr.load(QLocale(QLocale.Language.Russian), "qtbase", "_",
+                   QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+            app.installTranslator(tr)
+            app._mf_translator = tr  # держим ссылку, чтобы переводчик не удалился
+    except Exception:
+        pass
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
+    # В оконной сборке PyInstaller stdout/stderr отсутствуют.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
     selftest = next((a for a in argv if a.startswith("--selftest")), None)
     if selftest:
         from .selftest import run_selftest
 
         return run_selftest(selftest.partition("=")[2] or None)
     app = create_app(argv)
-    _install_excepthook()
     storage = Storage()
+    _install_excepthook(os.path.dirname(storage.path))
     ctx = AppContext(storage)
     apply_theme(app, ctx.setting("theme", "dark"))
     win = MainWindow(ctx)

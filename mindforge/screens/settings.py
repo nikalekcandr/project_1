@@ -8,7 +8,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QCheckBox, QFileDialog, QLineEdit, QMessageBox, QSlider
 
@@ -63,9 +63,14 @@ class SettingsPage(ScrollPage):
         test = button("Проверить", None, "sm", icon_name="volume", on_click=lambda: ctx.sound.play("levelup"))
         snd.lay.addWidget(cb)
         snd.lay.addLayout(hbox(label("Громкость", "muted"), slider, test, "stretch", spacing=16))
-        voice = ctx.speech.voice_name if ctx.speech.available else None
-        vtxt = (f"Голос для «Двойного N-назад»: {voice}" if voice
-                else "Синтез речи не найден — в «Двойном N-назад» будут использоваться ноты.")
+        if not ctx.speech.checked:
+            voice = None
+            vtxt = "Проверяем синтез речи…"
+            QTimer.singleShot(1500, self._check_voice)
+        else:
+            voice = ctx.speech.voice_name if ctx.speech.available else None
+            vtxt = (f"Голос для «Двойного N-назад»: {voice}" if voice
+                    else "Синтез речи не найден — в «Двойном N-назад» будут использоваться ноты.")
         snd.lay.addWidget(label(vtxt, "faint", wrap=True))
         if voice:
             snd.lay.addLayout(hbox(button("Проверить голос", None, "sm", icon_name="volume",
@@ -95,6 +100,11 @@ class SettingsPage(ScrollPage):
             "Горячие клавиши: Esc — выйти из упражнения, Enter — начать/продолжить. "
             "В каждом упражнении подсказка по клавишам показана на экране правил.", "faint", wrap=True))
         self.body_lay.addStretch(1)
+
+    def _check_voice(self) -> None:
+        if not self.ctx.speech.checked:
+            _ = self.ctx.speech.available
+            self.build()
 
     # ------------------------------------------------------------ обработчики
     def _save_name(self) -> None:

@@ -29,35 +29,63 @@ class Speech:
             from PySide6.QtCore import QLocale
             from PySide6.QtTextToSpeech import QTextToSpeech
 
-            if not QTextToSpeech.availableEngines():
-                return
-            tts = QTextToSpeech()
-            if tts.state() == QTextToSpeech.State.Error:
-                return
-            voices_ru = [v for v in tts.availableVoices() if v.locale().language() == QLocale.Language.Russian]
-            if not voices_ru:
-                for loc in tts.availableLocales():
-                    if loc.language() == QLocale.Language.Russian:
-                        tts.setLocale(loc)
-                        voices_ru = list(tts.availableVoices())
-                        break
-            if voices_ru:
-                tts.setVoice(voices_ru[0])
-                self._lang = "ru"
-            else:
-                for loc in tts.availableLocales():
-                    if loc.language() == QLocale.Language.English:
-                        tts.setLocale(loc)
-                        break
+            engines = [e for e in QTextToSpeech.availableEngines() if e != "mock"]
+            order = ["winrt", "sapi", "darwin", "speechd", "flite", "android"]
+            engines.sort(key=lambda e: order.index(e) if e in order else len(order))
+            fallback = None
+            for engine in engines:
+                tts = self._create(QTextToSpeech, engine)
+                if tts is None:
+                    continue
+                voices = list(tts.availableVoices())
+                ru = [v for v in voices if v.locale().language() == QLocale.Language.Russian]
+                if ru:
+                    tts.setLocale(ru[0].locale())
+                    tts.setVoice(ru[0])
+                    self._lang = "ru"
+                    self._finish(tts)
+                    return
+                en = [v for v in voices if v.locale().language() == QLocale.Language.English]
+                if en and fallback is None:
+                    fallback = (tts, en[0])
+            if fallback is not None:
+                tts, voice = fallback
+                tts.setLocale(voice.locale())
+                tts.setVoice(voice)
                 self._lang = "en"
-            if not tts.availableVoices():
-                return
-            tts.setRate(0.15)
-            tts.setVolume(1.0)
-            self.voice_name = tts.voice().name()
-            self._tts = tts
+                self._finish(tts)
         except Exception:
             self._tts = None
+
+    @staticmethod
+    def _create(cls, engine: str):
+        """Создаёт движок и ждёт (до ~1.5 с) его готовности."""
+        from PySide6.QtCore import QEventLoop, QTimer
+
+        try:
+            tts = cls(engine)
+        except Exception:
+            return None
+        if tts.state() == cls.State.Error:
+            return None
+        if tts.state() != cls.State.Ready:
+            loop = QEventLoop()
+            tts.stateChanged.connect(lambda *_: loop.quit())
+            QTimer.singleShot(1500, loop.quit)
+            loop.exec()
+        if tts.state() == cls.State.Error or not tts.availableVoices():
+            return None
+        return tts
+
+    def _finish(self, tts) -> None:
+        tts.setRate(0.15)
+        tts.setVolume(1.0)
+        self.voice_name = f"{tts.voice().name()} ({tts.engine()})"
+        self._tts = tts
+
+    @property
+    def checked(self) -> bool:
+        return self._tried
 
     @property
     def available(self) -> bool:

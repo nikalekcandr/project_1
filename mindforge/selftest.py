@@ -54,6 +54,7 @@ def run_selftest(report_path: str | None = None) -> int:
         report["platform"] = sys.platform
         report["frozen"] = bool(getattr(sys, "frozen", False))
         app = create_app([sys.argv[0]])
+        report["translations_ru"] = bool(getattr(app, "_mf_translator", None))
         storage = Storage()
         ctx = AppContext(storage)
         ctx.set_setting("onboarded", True)
