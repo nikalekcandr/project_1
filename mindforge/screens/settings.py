@@ -59,7 +59,8 @@ class SettingsPage(ScrollPage):
         slider.setRange(0, 100)
         slider.setValue(int(ctx.sound.volume * 100))
         slider.setMaximumWidth(260)
-        slider.sliderReleased.connect(lambda: self._set_volume(slider.value()))
+        slider.valueChanged.connect(self._store_volume)
+        slider.sliderReleased.connect(lambda: self.ctx.sound.play("correct"))
         test = button("Проверить", None, "sm", icon_name="volume", on_click=lambda: ctx.sound.play("levelup"))
         snd.lay.addWidget(cb)
         snd.lay.addLayout(hbox(label("Громкость", "muted"), slider, test, "stretch", spacing=16))
@@ -120,10 +121,9 @@ class SettingsPage(ScrollPage):
         self.ctx.sound.set_enabled(on)
         self.ctx.set_setting("sound", on)
 
-    def _set_volume(self, v: int) -> None:
+    def _store_volume(self, v: int) -> None:
         self.ctx.sound.set_volume(v / 100)
         self.ctx.set_setting("volume", v / 100)
-        self.ctx.sound.play("correct")
 
     def _set_daily(self, v: str) -> None:
         self.ctx.set_setting("daily_count", int(v))

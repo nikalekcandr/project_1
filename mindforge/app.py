@@ -189,8 +189,17 @@ class MainWindow(QMainWindow):
         ctx.window = self
         self.setWindowTitle(APP_TITLE)
         self.setWindowIcon(app_icon())
-        self.resize(1320, 860)
-        self.setMinimumSize(1060, 700)
+        self.setMinimumSize(980, 620)
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            w = min(1360, int(avail.width() * 0.92))
+            h = min(880, int(avail.height() * 0.92))
+            self.resize(max(w, 980), max(h, 620))
+            self.move(avail.x() + (avail.width() - self.width()) // 2,
+                      avail.y() + (avail.height() - self.height()) // 2)
+        else:
+            self.resize(1320, 860)
 
         central = QWidget()
         central.setObjectName("Content")
@@ -379,7 +388,11 @@ def main(argv: list[str] | None = None) -> int:
     ctx = AppContext(storage)
     apply_theme(app, ctx.setting("theme", "dark"))
     win = MainWindow(ctx)
-    win.show()
+    screen = app.primaryScreen()
+    if screen is not None and (screen.availableGeometry().width() < 1300 or screen.availableGeometry().height() < 820):
+        win.showMaximized()
+    else:
+        win.show()
     QTimer.singleShot(400, lambda: ctx.sound._prepare())
     return app.exec()
 

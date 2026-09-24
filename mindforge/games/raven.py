@@ -284,6 +284,7 @@ class RavenGame(GameWidget):
         self.explain.setFont(font(11, QFont.Weight.DemiBold))
         self.btn_next = button("Далее  →", "primary", on_click=self.next_problem)
         self.btn_next.setVisible(False)
+        self.btn_next.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(24, 8, 24, 20)
         lay.setSpacing(28)

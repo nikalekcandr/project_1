@@ -249,6 +249,9 @@ class ReviewView(QWidget):
             gl.addWidget(b)
         gl.addStretch(1)
         lay.addWidget(self.grade_row)
+        for b in [self.btn_back, self.btn_show, *self.grade_btns.values()]:
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.hint = label("Оцените, насколько легко вспомнили: клавиши 1–4", "faint", align=Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self.hint)
         self.done_box = QWidget()

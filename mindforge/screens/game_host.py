@@ -437,6 +437,8 @@ class GameHost(QWidget):
             yes = box.addButton("Прервать", QMessageBox.ButtonRole.AcceptRole)
             box.addButton("Продолжить", QMessageBox.ButtonRole.RejectRole)
             box.exec()
+            if self.stack.currentWidget() is not self.play_page:
+                return  # упражнение успело завершиться, пока открыт диалог
             if box.clickedButton() is not yes:
                 if self.game:
                     self.game.setFocus()

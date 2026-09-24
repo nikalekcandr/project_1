@@ -267,6 +267,7 @@ class SeriesGame(GameWidget):
         self.explain.setMinimumHeight(52)
         self.btn_next = button("Далее  →", "primary", on_click=self.next_problem)
         self.btn_next.setVisible(False)
+        self.btn_next.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(32, 8, 32, 24)
         lay.setSpacing(16)

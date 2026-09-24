@@ -136,6 +136,7 @@ class WordsGame(GameWidget):
         for w in self.words:
             fl.addWidget(chip(w))
         self.btn_ready = button("Я запомнил(а)", "primary", "lg", on_click=self.start_test)
+        self.btn_ready.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         sl.addStretch(1)
         sl.addWidget(t)
         sl.addWidget(tip)
@@ -197,6 +198,7 @@ class WordsGame(GameWidget):
         gl.addWidget(self.recog_box)
         gl.addStretch(1)
         self.btn_check = button("Проверить", "primary", "lg", on_click=self._finish)
+        self.btn_check.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         cr = QHBoxLayout()
         cr.addStretch(1)
         cr.addWidget(self.btn_check)
@@ -227,17 +229,29 @@ class WordsGame(GameWidget):
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
                 b.setFont(font(12, QFont.Weight.DemiBold))
                 b.setMinimumHeight(42)
+                b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
                 b.toggled.connect(self._update_recog_counter)
                 self.recog_flow.addWidget(b)
                 self.recog_buttons.append(b)
             self._update_recog_counter()
             self.stack.setCurrentIndex(2)
+            self.setFocus()
             self.timer = Countdown(self, recall_seconds(self.count), self._finish)
         else:
             self._update_counter()
             self.stack.setCurrentIndex(1)
             self.entry.setFocus()
             self.timer = Countdown(self, recall_seconds(self.count), self._finish)
+
+    def keyPressEvent(self, e) -> None:
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if self.phase == "study":
+                self.start_test()
+                return
+            if self.mode == "recognize":
+                self._finish()
+                return
+        super().keyPressEvent(e)
 
     def _update_recog_counter(self, *_):
         n = sum(b.isChecked() for b in self.recog_buttons)
