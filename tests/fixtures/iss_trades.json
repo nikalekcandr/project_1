@@ -1,0 +1,5 @@
+{"trades": {"columns": ["TRADENO", "TRADETIME", "BOARDID", "SECID", "PRICE", "QUANTITY", "VALUE", "PERIOD", "TRADETIME_GRP", "SYSTIME", "BUYSELL", "DECIMALS", "TRADINGSESSION"], "data": [
+[1002, "10:00:01", "TQBR", "SBER", 300.01, 2, 6000.2, "N", 1000, "2025-09-25 10:00:01", "B", 2, "1"],
+[1001, "10:00:00", "TQBR", "SBER", 300.0, 5, 15000.0, "N", 1000, "2025-09-25 10:00:00", "S", 2, "1"],
+[1003, "10:00:02", "TQBR", "SBER", 299.99, 1, 2999.9, "N", 1000, "2025-09-25 10:00:02", "S", 2, "1"]
+]}}

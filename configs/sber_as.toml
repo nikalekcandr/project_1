@@ -1,0 +1,49 @@
+# Бэктест Авельянеды–Стойкова на минутных свечах SBER (MOEX ISS).
+# Запуск: mmsim run -c configs/sber_as.toml
+
+[data]
+source = "moex"          # moex | csv | synthetic
+secid = "SBER"
+board = "TQBR"           # T+ акции
+engine = "stock"
+market = "shares"
+start = "2025-09-01"     # первый день бэктеста (история для калибровки подгрузится сама)
+end = "2025-09-30"
+interval = 1             # минутные свечи
+cache_dir = "data/cache"
+
+[sessions]
+use = ["main"]           # main | morning | evening; custom = { main = ["10:00", "18:40"] }
+
+[strategy]
+name = "as"              # as | as_symmetric | glft | glft_exact | fixed
+gamma = 0.01             # неприятие риска, 1/(руб.·ед. запаса)
+order_size = 1           # лотов в котировке
+horizon = "session"      # session | rolling | infinite
+horizon_seconds = 3600   # для horizon = "rolling"
+
+[execution]
+fill_model = "candle"            # candle | trades | intensity
+touch_fill_prob = 0.3            # исполнение при касании уровня (позиция в очереди)
+max_participation = 0.2          # доля объёма бара, доступная нашей заявке
+maker_fee_bps = 1.0              # подставьте свой тариф брокера + биржи
+taker_fee_bps = 3.0
+max_inventory = 10               # лотов
+post_only = true
+market_half_spread_ticks = 0.5
+min_spread_ticks = 1
+liquidation_slippage_ticks = 1.0
+flatten_at_session_end = true    # закрывать позицию к концу сессии
+seed = 42
+
+[calibration]
+mode = "walk_forward"    # walk_forward | full_sample | fixed
+window_days = 5
+sigma_ewma_halflife = 0  # >0 — адаптивная σ внутри дня (в барах)
+# sigma = 0.03           # фиксированные значения / переопределения
+# A = 0.05
+# k = 8.0
+
+[report]
+out_dir = "reports/sber_as"
+# plot_day = "2025-09-15"

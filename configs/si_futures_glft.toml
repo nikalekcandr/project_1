@@ -1,0 +1,34 @@
+# Фьючерс на курс доллар/рубль (FORTS), модель GLFT с точным решением.
+# Код контракта меняется ежеквартально: подставьте актуальный (SiZ5, SiH6, …).
+# Стоимость шага цены берётся из ISS (STEPPRICE).
+
+[data]
+source = "moex"
+secid = "SiZ5"
+engine = "futures"
+market = "forts"
+board = "RFUD"
+start = "2025-10-01"
+end = "2025-10-31"
+interval = 1
+
+[sessions]
+use = ["main"]
+
+[strategy]
+name = "glft_exact"
+gamma = 0.001
+order_size = 1
+
+[execution]
+fill_model = "candle"
+maker_fee_bps = 0.5
+taker_fee_bps = 1.0
+max_inventory = 20
+
+[calibration]
+mode = "walk_forward"
+window_days = 5
+
+[report]
+out_dir = "reports/si_glft"

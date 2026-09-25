@@ -1,0 +1,4 @@
+{"securities": {"columns": ["SECID", "BOARDID", "SHORTNAME", "PREVPRICE", "LOTSIZE", "FACEVALUE", "STATUS", "BOARDNAME", "DECIMALS", "SECNAME", "MINSTEP", "CURRENCYID"], "data": [
+["SBER", "TQBR", "Сбербанк", 300.5, 10, 3, "A", "Т+: Акции и ДР - безадрес.", 2, "Сбербанк России ПАО ао", 0.01, "SUR"]
+]},
+"marketdata": {"columns": ["SECID", "BID", "OFFER", "SPREAD", "LAST"], "data": [["SBER", 300.49, 300.5, 0.01, 300.5]]}}

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mmsim"
+version = "0.1.0"
+description = "Симулятор маркет-мейкинга Авельянеды–Стойкова на данных Московской биржи"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "requests>=2.28",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+mmsim = "mmsim.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mmsim*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,24 @@
+# Офлайн-демо без доступа к бирже: синтетическая лента «в стиле» SBER.
+# Запуск: mmsim run -c configs/synthetic_demo.toml
+
+[data]
+source = "synthetic"
+secid = "SBER"
+synthetic_days = 15
+synthetic_seed = 7
+
+[strategy]
+name = "as"
+gamma = 0.01
+horizon = "session"
+
+[execution]
+fill_model = "candle"
+max_inventory = 10
+
+[calibration]
+mode = "walk_forward"
+window_days = 3
+
+[report]
+out_dir = "reports/synthetic_demo"
