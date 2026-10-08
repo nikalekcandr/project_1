@@ -92,7 +92,12 @@ export function ideasPrompt(profile: FounderProfile, brief: string, count: numbe
     `- Навыки: ${profile.skills.map((s) => SKILLS[s]).join(", ") || "не указаны"}`,
     `- Бюджет на старт: ${fmtMoney(profile.budget)}`,
     `- Время: ${profile.hoursPerWeek} ч/нед.`,
-    `- Интересные отрасли: ${profile.interests.map((i) => getIndustry(i)?.name).filter(Boolean).join(", ") || "любые"}`,
+    `- Интересные отрасли: ${
+      profile.interests
+        .map((i) => getIndustry(i)?.name)
+        .filter(Boolean)
+        .join(", ") || "любые"
+    }`,
     `- Предпочтительные сегменты: ${profile.preferredSegments.map((s) => SEGMENTS[s]).join(", ") || "любые"}`,
     `- Отношение к риску: ${profile.riskTolerance}`,
     "",

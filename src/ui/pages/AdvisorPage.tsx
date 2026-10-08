@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { completeAi, isAiConfigured } from "../../ai/client";
+import { isHosted, usePlatformVersion } from "../../platform";
 import { ADVISOR_PROMPT, SYSTEM_BASE, projectContext } from "../../ai/prompts";
 import { actions, useStore, type ChatMessage } from "../../state/store";
 import { AiButton, useAiTask } from "../components/Ai";
@@ -25,6 +26,7 @@ export function AdvisorPage() {
   const [input, setInput] = useState("");
   const ai = useAiTask();
   const endRef = useRef<HTMLDivElement>(null);
+  usePlatformVersion();
   const configured = isAiConfigured();
 
   useEffect(() => {
@@ -80,14 +82,17 @@ export function AdvisorPage() {
                   </button>
                 ))}
               </div>
-              {!configured && (
-                <div className="callout ok small">
-                  Для консультанта нужен API-ключ Anthropic.{" "}
-                  <a href="#/settings" onClick={() => navigate("settings")}>
-                    Добавить ключ в настройках
-                  </a>
-                </div>
-              )}
+              {!configured &&
+                (isHosted ? (
+                  <div className="callout ok small">Консультант работает через ваш аккаунт claude.ai — войдите, чтобы задать вопрос.</div>
+                ) : (
+                  <div className="callout ok small">
+                    Для консультанта нужен API-ключ Anthropic.{" "}
+                    <a href="#/settings" onClick={() => navigate("settings")}>
+                      Добавить ключ в настройках
+                    </a>
+                  </div>
+                ))}
             </div>
           )}
           {history.map((m) =>

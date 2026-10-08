@@ -111,13 +111,19 @@ export function OverviewPage() {
                   label="Отрасль"
                   value={p.idea.industryId ?? ""}
                   onChange={(industryId) => setIdea({ industryId: industryId || undefined })}
-                  options={[{ value: "", label: "— не выбрана —" }, ...INDUSTRIES.map((i) => ({ value: i.id, label: `${i.emoji} ${i.name}` }))]}
+                  options={[
+                    { value: "", label: "— не выбрана —" },
+                    ...INDUSTRIES.map((i) => ({ value: i.id, label: `${i.emoji} ${i.name}` })),
+                  ]}
                 />
                 <Select
                   label="Бизнес-модель"
                   value={p.idea.modelId ?? ""}
                   onChange={(modelId) => setIdea({ modelId: modelId || undefined })}
-                  options={[{ value: "", label: "— не выбрана —" }, ...BUSINESS_MODELS.map((m) => ({ value: m.id, label: `${m.emoji} ${m.name}` }))]}
+                  options={[
+                    { value: "", label: "— не выбрана —" },
+                    ...BUSINESS_MODELS.map((m) => ({ value: m.id, label: `${m.emoji} ${m.name}` })),
+                  ]}
                 />
                 <Select
                   label="Стадия"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { actions, useActiveProject, useStore } from "./state/store";
-import { Toasts } from "./ui/components/ui";
+import { ConfirmHost, Toasts } from "./ui/components/ui";
 import { navigate, useRoute, type Route } from "./ui/router";
 import { AdvisorPage } from "./ui/pages/AdvisorPage";
 import { CanvasPage } from "./ui/pages/CanvasPage";
@@ -111,7 +111,16 @@ export function App() {
       <aside className={`sidebar ${menuOpen ? "open" : ""}`} aria-label="Навигация">
         <div className="brand">
           <div className="brand-logo" aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#fff"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M3 18l6-12 5 9 2.5-4L21 18" />
             </svg>
           </div>
@@ -168,7 +177,12 @@ export function App() {
           <button className="btn sm hide-sm" onClick={() => navigate("generator")}>
             💡 Новые идеи
           </button>
-          <button className="btn ghost icon" onClick={cycleTheme} title={`Тема: ${theme === "system" ? "как в системе" : theme === "dark" ? "тёмная" : "светлая"}`} aria-label="Сменить тему">
+          <button
+            className="btn ghost icon"
+            onClick={cycleTheme}
+            title={`Тема: ${theme === "system" ? "как в системе" : theme === "dark" ? "тёмная" : "светлая"}`}
+            aria-label="Сменить тему"
+          >
             {theme === "dark" ? "🌙" : theme === "light" ? "☀️" : "🌓"}
           </button>
         </header>
@@ -177,6 +191,7 @@ export function App() {
         </main>
       </div>
       <Toasts />
+      <ConfirmHost />
     </div>
   );
 }

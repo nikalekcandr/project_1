@@ -152,9 +152,7 @@ export function RisksPage() {
                 ))}
               </div>
               {a.risks.unmitigated.length > 0 && (
-                <div className="callout warn small mt-16">
-                  Без плана снижения: {a.risks.unmitigated.map((r) => r.title).join("; ")}
-                </div>
+                <div className="callout warn small mt-16">Без плана снижения: {a.risks.unmitigated.map((r) => r.title).join("; ")}</div>
               )}
             </Card>
           </div>
@@ -276,7 +274,11 @@ function LibraryPicker(props: { existing: Set<string>; onAdd: (items: Omit<Risk,
         );
       })}
       <div className="row">
-        <button className="btn primary" disabled={!picked.length} onClick={() => props.onAdd(RISK_LIBRARY.filter((r) => picked.includes(r.title)))}>
+        <button
+          className="btn primary"
+          disabled={!picked.length}
+          onClick={() => props.onAdd(RISK_LIBRARY.filter((r) => picked.includes(r.title)))}
+        >
           Добавить выбранные ({picked.length})
         </button>
       </div>

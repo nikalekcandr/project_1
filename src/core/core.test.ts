@@ -114,7 +114,14 @@ describe("idea generator", () => {
   it("rewards founder fit in the quick score", () => {
     const industry = getIndustry("education");
     const model = getModel("courses");
-    const weak: FounderProfile = { skills: [], budget: 10_000, hoursPerWeek: 10, interests: [], riskTolerance: "low", preferredSegments: ["b2b"] };
+    const weak: FounderProfile = {
+      skills: [],
+      budget: 10_000,
+      hoursPerWeek: 10,
+      interests: [],
+      riskTolerance: "low",
+      preferredSegments: ["b2b"],
+    };
     const strong: FounderProfile = {
       skills: ["content", "product", "marketing", "domain"],
       budget: 5_000_000,
@@ -171,7 +178,18 @@ describe("validation", () => {
   it("upgrades evidence when a linked hypothesis is validated", () => {
     const answers = { problem_pain: { score: 4, evidence: "guess" as const } };
     const r = evaluateValidation(answers, [
-      { id: "h", statement: "x", type: "problem", criterionId: "problem_pain", impact: 5, confidence: 5, ease: 5, successMetric: "", status: "validated", result: "" },
+      {
+        id: "h",
+        statement: "x",
+        type: "problem",
+        criterionId: "problem_pain",
+        impact: 5,
+        confidence: 5,
+        ease: 5,
+        successMetric: "",
+        status: "validated",
+        result: "",
+      },
     ]);
     expect(r.results.find((x) => x.criterion.id === "problem_pain")?.effectiveEvidence).toBe("data");
     expect(r.confidence).toBeCloseTo(1);
@@ -248,7 +266,7 @@ describe("financial model", () => {
     expect(r.rows).toHaveLength(24);
     expect(r.rows[0].activeCustomers).toBe(10);
     expect(r.rows[11].activeCustomers).toBe(120);
-    expect(r.years[0].revenue).toBe(100 * 10 * (12 * 13) / 2);
+    expect(r.years[0].revenue).toBe((100 * 10 * (12 * 13)) / 2);
     expect(r.breakEvenMonth).toBe(1);
     expect(r.fundingNeed).toBe(0);
   });

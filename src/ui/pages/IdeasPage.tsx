@@ -38,7 +38,11 @@ export function IdeasPage() {
       (i) => (!onlyFav || i.favorite) && (!q || `${i.title} ${i.oneLiner} ${i.problem}`.toLowerCase().includes(q)),
     );
     return [...filtered].sort((a, b) =>
-      sort === "score" ? (b.quickScore ?? 0) - (a.quickScore ?? 0) : sort === "new" ? b.createdAt - a.createdAt : a.title.localeCompare(b.title, "ru"),
+      sort === "score"
+        ? (b.quickScore ?? 0) - (a.quickScore ?? 0)
+        : sort === "new"
+          ? b.createdAt - a.createdAt
+          : a.title.localeCompare(b.title, "ru"),
     );
   }, [ideas, sort, query, onlyFav]);
 

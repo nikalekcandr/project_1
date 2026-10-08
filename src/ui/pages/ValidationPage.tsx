@@ -53,20 +53,21 @@ export function ValidationPage() {
   const addHypothesis = (criterionId: CriterionId) => {
     const type = CRITERION_HYPOTHESIS[criterionId] ?? "solution";
     const c = CRITERIA.find((x) => x.id === criterionId)!;
-    update((d) =>
-      void d.hypotheses.push({
-        id: newId("hyp"),
-        statement: hypothesisTemplate(type, p.idea),
-        type,
-        criterionId,
-        impact: Math.min(10, Math.round(c.weight * 3)),
-        confidence: 3,
-        ease: 6,
-        experimentId: recommendExperiments(type, 1)[0]?.id,
-        successMetric: "",
-        status: "untested",
-        result: "",
-      }),
+    update(
+      (d) =>
+        void d.hypotheses.push({
+          id: newId("hyp"),
+          statement: hypothesisTemplate(type, p.idea),
+          type,
+          criterionId,
+          impact: Math.min(10, Math.round(c.weight * 3)),
+          confidence: 3,
+          ease: 6,
+          experimentId: recommendExperiments(type, 1)[0]?.id,
+          successMetric: "",
+          status: "untested",
+          result: "",
+        }),
     );
     toast("Гипотеза добавлена — уточните её формулировку");
     navigate("experiments");

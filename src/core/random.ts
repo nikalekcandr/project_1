@@ -41,9 +41,7 @@ export function triangular(rng: Rng, min: number, mode: number, max: number): nu
   const m = Math.min(Math.max(mode, min), max);
   const u = rng();
   const c = (m - min) / (max - min);
-  return u < c
-    ? min + Math.sqrt(u * (max - min) * (m - min))
-    : max - Math.sqrt((1 - u) * (max - min) * (max - m));
+  return u < c ? min + Math.sqrt(u * (max - min) * (m - min)) : max - Math.sqrt((1 - u) * (max - min) * (max - m));
 }
 
 export function newId(prefix = "id"): string {

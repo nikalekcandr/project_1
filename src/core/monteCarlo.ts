@@ -66,11 +66,7 @@ function distribution(values: number[]): Distribution {
   };
 }
 
-export function sampleAssumptions(
-  base: FinanceAssumptions,
-  params: MonteCarloParam[],
-  rnd: () => number,
-): FinanceAssumptions {
+export function sampleAssumptions(base: FinanceAssumptions, params: MonteCarloParam[], rnd: () => number): FinanceAssumptions {
   const a: FinanceAssumptions = { ...base };
   for (const p of params) {
     if (!p.enabled) continue;

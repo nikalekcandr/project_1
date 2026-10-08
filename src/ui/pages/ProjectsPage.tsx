@@ -5,7 +5,7 @@ import { fmtMoney, slugify } from "../../core/format";
 import type { Project } from "../../core/types";
 import { VERDICTS } from "../../core/validation";
 import { actions, useStore } from "../../state/store";
-import { Badge, Card, Empty, Modal, PageHeader, TextField, downloadFile, toast } from "../components/ui";
+import { Badge, Card, Empty, Modal, PageHeader, TextField, confirmDialog, downloadFile, toast } from "../components/ui";
 import { navigate } from "../router";
 
 export function ProjectsPage() {
@@ -121,8 +121,14 @@ export function ProjectsPage() {
                     </button>
                     <button
                       className="btn sm ghost danger"
-                      onClick={() => {
-                        if (confirm(`Удалить проект «${p.name}»? Это действие нельзя отменить.`)) actions.deleteProject(p.id);
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          title: "Удалить проект?",
+                          message: `Проект «${p.name}» будет удалён без возможности восстановления. Сначала можно сделать экспорт.`,
+                          confirmLabel: "Удалить",
+                          danger: true,
+                        });
+                        if (ok) actions.deleteProject(p.id);
                       }}
                     >
                       Удалить
@@ -147,10 +153,15 @@ function NewProjectModal(props: { onClose: () => void }) {
   const [title, setTitle] = useState("");
   return (
     <Modal title="Новый проект" onClose={props.onClose}>
-      <TextField label="Название идеи или проекта" value={title} onChange={setTitle} placeholder="Например: сервис доставки цветов по подписке" />
+      <TextField
+        label="Название идеи или проекта"
+        value={title}
+        onChange={setTitle}
+        placeholder="Например: сервис доставки цветов по подписке"
+      />
       <p className="small text-2 mt-8">
-        Проект создастся с типовыми допущениями — дальше вы заполните описание, оценку и финмодель. Если идеи ещё нет —
-        загляните в генератор.
+        Проект создастся с типовыми допущениями — дальше вы заполните описание, оценку и финмодель. Если идеи ещё нет — загляните в
+        генератор.
       </p>
       <div className="row mt-16">
         <button

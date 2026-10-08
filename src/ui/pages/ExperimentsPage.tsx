@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { completeJson } from "../../ai/client";
 import { HYPOTHESES_PROMPT, HYPOTHESES_SCHEMA, SYSTEM_BASE, projectContext } from "../../ai/prompts";
-import { getExperiment, hypothesisTemplate, interviewScript, priorityScore, recommendExperiments, sortByPriority } from "../../core/experiments";
+import {
+  getExperiment,
+  hypothesisTemplate,
+  interviewScript,
+  priorityScore,
+  recommendExperiments,
+  sortByPriority,
+} from "../../core/experiments";
 import { EXPERIMENTS, HYPOTHESIS_TYPES } from "../../core/knowledge/library";
 import { newId } from "../../core/random";
 import type { Hypothesis, HypothesisStatus, HypothesisType } from "../../core/types";
@@ -56,7 +63,7 @@ export function ExperimentsPage() {
 
   const generate = async () => {
     const res = await ai.run((signal) =>
-      completeJson<{ hypotheses: (Omit<Hypothesis, "id" | "status" | "result" | "criterionId">)[] }>({
+      completeJson<{ hypotheses: Omit<Hypothesis, "id" | "status" | "result" | "criterionId">[] }>({
         system: `${SYSTEM_BASE}\n\n${projectContext(p, a)}`,
         messages: [{ role: "user", content: HYPOTHESES_PROMPT }],
         schema: HYPOTHESES_SCHEMA,
@@ -134,8 +141,8 @@ export function ExperimentsPage() {
             </div>
             <div className="row-between mt-8">
               <p className="small text-2" style={{ margin: 0, flex: "1 1 320px" }}>
-                Приоритет = влияние × (11 − уверенность) × простота. Наверху — то, что сильнее всего влияет на успех, в чём вы
-                меньше всего уверены и что проще проверить.
+                Приоритет = влияние × (11 − уверенность) × простота. Наверху — то, что сильнее всего влияет на успех, в чём вы меньше всего
+                уверены и что проще проверить.
               </p>
               <button className="btn sm" onClick={() => setOrder(sortByPriority(p.hypotheses).map((h) => h.id))}>
                 ↕ Упорядочить по приоритету
@@ -184,7 +191,10 @@ export function ExperimentsPage() {
                       label="Тип"
                       value={h.type}
                       onChange={(type) => setH(h.id, { type })}
-                      options={(Object.keys(HYPOTHESIS_TYPES) as HypothesisType[]).map((t) => ({ value: t, label: HYPOTHESIS_TYPES[t].label }))}
+                      options={(Object.keys(HYPOTHESIS_TYPES) as HypothesisType[]).map((t) => ({
+                        value: t,
+                        label: HYPOTHESIS_TYPES[t].label,
+                      }))}
                     />
                     <Select
                       label="Влияет на критерий"
@@ -192,9 +202,30 @@ export function ExperimentsPage() {
                       onChange={(v) => setH(h.id, { criterionId: (v || undefined) as Hypothesis["criterionId"] })}
                       options={[{ value: "", label: "—" }, ...CRITERIA.map((c) => ({ value: c.id, label: c.name }))]}
                     />
-                    <NumberField label="Влияние (1–10)" value={h.impact} digits={0} min={1} max={10} onChange={(v) => setH(h.id, { impact: Math.round(v) })} />
-                    <NumberField label="Уверенность (1–10)" value={h.confidence} digits={0} min={1} max={10} onChange={(v) => setH(h.id, { confidence: Math.round(v) })} />
-                    <NumberField label="Простота (1–10)" value={h.ease} digits={0} min={1} max={10} onChange={(v) => setH(h.id, { ease: Math.round(v) })} />
+                    <NumberField
+                      label="Влияние (1–10)"
+                      value={h.impact}
+                      digits={0}
+                      min={1}
+                      max={10}
+                      onChange={(v) => setH(h.id, { impact: Math.round(v) })}
+                    />
+                    <NumberField
+                      label="Уверенность (1–10)"
+                      value={h.confidence}
+                      digits={0}
+                      min={1}
+                      max={10}
+                      onChange={(v) => setH(h.id, { confidence: Math.round(v) })}
+                    />
+                    <NumberField
+                      label="Простота (1–10)"
+                      value={h.ease}
+                      digits={0}
+                      min={1}
+                      max={10}
+                      onChange={(v) => setH(h.id, { ease: Math.round(v) })}
+                    />
                     <Select
                       label="Статус"
                       value={h.status}
@@ -208,7 +239,10 @@ export function ExperimentsPage() {
                         label="Эксперимент"
                         value={h.experimentId ?? ""}
                         onChange={(v) => setH(h.id, { experimentId: v || undefined })}
-                        options={[{ value: "", label: "— не выбран —" }, ...EXPERIMENTS.map((e) => ({ value: e.id, label: `${e.emoji} ${e.name}` }))]}
+                        options={[
+                          { value: "", label: "— не выбран —" },
+                          ...EXPERIMENTS.map((e) => ({ value: e.id, label: `${e.emoji} ${e.name}` })),
+                        ]}
                       />
                       <span className="field-hint">Рекомендуем: {recs.map((r) => r.name).join(", ")}</span>
                     </div>
@@ -264,7 +298,10 @@ export function ExperimentsPage() {
                 <div className="row small">
                   <span className="tag">Стоимость {"₽".repeat(e.cost)}</span>
                   <span className="tag">~{e.days} дн.</span>
-                  <span className="tag">Сила доказательства {"●".repeat(e.evidence)}{"○".repeat(5 - e.evidence)}</span>
+                  <span className="tag">
+                    Сила доказательства {"●".repeat(e.evidence)}
+                    {"○".repeat(5 - e.evidence)}
+                  </span>
                 </div>
                 <ol className="small text-2" style={{ paddingLeft: 20, margin: "10px 0" }}>
                   {e.steps.map((s) => (

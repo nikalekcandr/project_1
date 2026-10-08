@@ -314,9 +314,7 @@ export function applyScenario(a: FinanceAssumptions, s: Scenario): FinanceAssump
 
 /** Monthly burn of fixed costs (team + opex) at a given month — useful for runway math. */
 export function fixedCostsAt(a: FinanceAssumptions, month: number): number {
-  const payroll = a.team
-    .filter((m) => month >= m.startMonth)
-    .reduce((s, m) => s + m.salary * m.count * (1 + a.payrollTax), 0);
+  const payroll = a.team.filter((m) => month >= m.startMonth).reduce((s, m) => s + m.salary * m.count * (1 + a.payrollTax), 0);
   const opex = a.costs
     .filter((c) => month >= c.startMonth)
     .reduce((s, c) => s + c.monthly * Math.pow(1 + c.growthPerYear, (month - c.startMonth) / 12), 0);

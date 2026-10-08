@@ -7,7 +7,7 @@ import { fmtMoney, fmtPercent } from "../../core/format";
 import { BUSINESS_MODELS, getModel, type BusinessModelPattern } from "../../core/knowledge/businessModels";
 import type { CanvasData, LeanBlockId } from "../../core/types";
 import { AiButton, useAiTask } from "../components/Ai";
-import { Badge, Card, PageHeader, Progress, Tabs, toast } from "../components/ui";
+import { Badge, Card, PageHeader, Progress, Tabs, confirmDialog, toast } from "../components/ui";
 import { useProject } from "../hooks";
 
 type Tab = "lean" | "bmc" | "library";
@@ -26,7 +26,13 @@ function CanvasGrid<K extends string>(props: {
           <div key={b.id} className="canvas-block" style={{ gridArea: b.area }}>
             <div className="cb-title">
               <span>{b.title}</span>
-              {filled ? <span aria-label="заполнено">✓</span> : <span className="muted" aria-label="пусто">○</span>}
+              {filled ? (
+                <span aria-label="заполнено">✓</span>
+              ) : (
+                <span className="muted" aria-label="пусто">
+                  ○
+                </span>
+              )}
             </div>
             <div className="cb-hint">{b.hint}</div>
             <textarea
@@ -59,7 +65,14 @@ export function CanvasPage() {
     );
     if (!res) return;
     const hasContent = LEAN_BLOCKS.some((b) => (p.lean[b.id] ?? "").trim());
-    const overwrite = !hasContent || confirm("Заменить текущее содержимое Lean Canvas вариантом ИИ? «Отмена» — заполнить только пустые блоки.");
+    const overwrite =
+      !hasContent ||
+      (await confirmDialog({
+        title: "Вариант ИИ готов",
+        message: "Заменить текущее содержимое Lean Canvas вариантом ИИ или заполнить только пустые блоки?",
+        confirmLabel: "Заменить всё",
+        cancelLabel: "Только пустые блоки",
+      }));
     update((d) => {
       for (const b of LEAN_BLOCKS) {
         if (res[b.id] && (overwrite || !(d.lean[b.id] ?? "").trim())) d.lean[b.id] = res[b.id];
@@ -68,10 +81,14 @@ export function CanvasPage() {
     toast("Lean Canvas заполнен с помощью ИИ — проверьте и отредактируйте");
   };
 
-  const applyModel = (m: BusinessModelPattern) => {
-    const updateUnit = confirm(
-      `Применить модель «${m.name}»?\n\nПустые блоки холстов заполнятся типовыми формулировками.\nНажмите «ОК», чтобы также подставить типовые метрики юнит-экономики и финмодели (чек, маржа, отток, CAC), или «Отмена», чтобы изменить только холсты.`,
-    );
+  const applyModel = async (m: BusinessModelPattern) => {
+    const updateUnit = await confirmDialog({
+      title: `Модель «${m.name}»`,
+      message:
+        "Пустые блоки холстов заполнятся типовыми формулировками. Подставить также типовые метрики модели (чек, маржа, отток, CAC) в юнит-экономику и финмодель?",
+      confirmLabel: "Да, и метрики тоже",
+      cancelLabel: "Только холсты",
+    });
     update((d) => {
       d.idea.modelId = m.id;
       for (const [k, v] of Object.entries(m.lean)) {
@@ -84,7 +101,15 @@ export function CanvasPage() {
       }
       if (updateUnit) {
         const u = defaultUnit(m);
-        d.unit = { ...d.unit, avgCheck: u.avgCheck, purchasesPerMonth: u.purchasesPerMonth, grossMargin: u.grossMargin, monthlyChurn: u.monthlyChurn, cac: u.cac, cacMode: "direct" };
+        d.unit = {
+          ...d.unit,
+          avgCheck: u.avgCheck,
+          purchasesPerMonth: u.purchasesPerMonth,
+          grossMargin: u.grossMargin,
+          monthlyChurn: u.monthlyChurn,
+          cac: u.cac,
+          cacMode: "direct",
+        };
         d.finance.arpu = Math.round(u.avgCheck * u.purchasesPerMonth);
         d.finance.grossMargin = u.grossMargin;
         d.finance.monthlyChurn = u.monthlyChurn;
@@ -172,9 +197,19 @@ export function CanvasPage() {
             )}
           </Card>
           {tab === "lean" ? (
-            <CanvasGrid className="canvas-lean" blocks={LEAN_BLOCKS} data={p.lean} onChange={(id, text) => update((d) => void (d.lean[id] = text))} />
+            <CanvasGrid
+              className="canvas-lean"
+              blocks={LEAN_BLOCKS}
+              data={p.lean}
+              onChange={(id, text) => update((d) => void (d.lean[id] = text))}
+            />
           ) : (
-            <CanvasGrid className="canvas-bmc" blocks={BMC_BLOCKS} data={p.bmc} onChange={(id, text) => update((d) => void (d.bmc[id] = text))} />
+            <CanvasGrid
+              className="canvas-bmc"
+              blocks={BMC_BLOCKS}
+              data={p.bmc}
+              onChange={(id, text) => update((d) => void (d.bmc[id] = text))}
+            />
           )}
         </div>
       ) : (
@@ -198,9 +233,18 @@ export function CanvasPage() {
                   <b>Примеры:</b> {m.examples.join(", ")}
                 </div>
                 <div className="row">
-                  <span className="tag">Масштабируемость {"●".repeat(m.scalability)}{"○".repeat(5 - m.scalability)}</span>
-                  <span className="tag">Капиталоёмкость {"●".repeat(m.capital)}{"○".repeat(5 - m.capital)}</span>
-                  <span className="tag">Скорость денег {"●".repeat(m.speedToRevenue)}{"○".repeat(5 - m.speedToRevenue)}</span>
+                  <span className="tag">
+                    Масштабируемость {"●".repeat(m.scalability)}
+                    {"○".repeat(5 - m.scalability)}
+                  </span>
+                  <span className="tag">
+                    Капиталоёмкость {"●".repeat(m.capital)}
+                    {"○".repeat(5 - m.capital)}
+                  </span>
+                  <span className="tag">
+                    Скорость денег {"●".repeat(m.speedToRevenue)}
+                    {"○".repeat(5 - m.speedToRevenue)}
+                  </span>
                 </div>
                 <div className="small text-2">
                   <b>Типично:</b> чек {fmtMoney(m.defaults.avgCheck)}, маржа {fmtPercent(m.defaults.grossMargin)}, отток{" "}

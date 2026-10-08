@@ -27,12 +27,42 @@ interface SolutionFormat {
 }
 
 const SOLUTION_FORMATS: SolutionFormat[] = [
-  { label: "Сервис «под ключ»", template: "сервис «под ключ», который полностью берёт на себя задачу — {job}", models: ["service", "productized"], segments: ["b2b", "b2c", "b2b2c"] },
-  { label: "Онлайн-платформа", template: "онлайн-платформа, которая помогает {job}", models: ["saas", "freemium", "pay_per_use"], segments: ["b2b", "b2c", "b2b2c"] },
-  { label: "Маркетплейс", template: "маркетплейс проверенных исполнителей, который помогает {job}", models: ["marketplace", "lead_gen"], segments: ["b2b", "b2c"] },
-  { label: "Мобильное приложение", template: "мобильное приложение, которое помогает {job}", models: ["freemium", "saas"], segments: ["b2c"] },
-  { label: "Продуктовый бренд", template: "продуктовый бренд с готовыми наборами, которые помогают {job}", models: ["d2c", "razor_blades"], segments: ["b2c"] },
-  { label: "Программа обучения", template: "практическая программа, которая учит {job}", models: ["courses", "community"], segments: ["b2c", "b2b"] },
+  {
+    label: "Сервис «под ключ»",
+    template: "сервис «под ключ», который полностью берёт на себя задачу — {job}",
+    models: ["service", "productized"],
+    segments: ["b2b", "b2c", "b2b2c"],
+  },
+  {
+    label: "Онлайн-платформа",
+    template: "онлайн-платформа, которая помогает {job}",
+    models: ["saas", "freemium", "pay_per_use"],
+    segments: ["b2b", "b2c", "b2b2c"],
+  },
+  {
+    label: "Маркетплейс",
+    template: "маркетплейс проверенных исполнителей, который помогает {job}",
+    models: ["marketplace", "lead_gen"],
+    segments: ["b2b", "b2c"],
+  },
+  {
+    label: "Мобильное приложение",
+    template: "мобильное приложение, которое помогает {job}",
+    models: ["freemium", "saas"],
+    segments: ["b2c"],
+  },
+  {
+    label: "Продуктовый бренд",
+    template: "продуктовый бренд с готовыми наборами, которые помогают {job}",
+    models: ["d2c", "razor_blades"],
+    segments: ["b2c"],
+  },
+  {
+    label: "Программа обучения",
+    template: "практическая программа, которая учит {job}",
+    models: ["courses", "community"],
+    segments: ["b2c", "b2b"],
+  },
 ];
 
 const CAPITAL_BUDGET: Record<number, number> = { 1: 100_000, 2: 300_000, 3: 1_000_000, 4: 3_000_000, 5: 10_000_000 };
@@ -106,8 +136,7 @@ export function quickScore(
   }
 
   const parts = { market, competition, model: modelScore, feasibility, regulation, founderFit };
-  const score =
-    market * 25 + competition * 10 + modelScore * 20 + feasibility * 15 + regulation * 10 + founderFit * 20;
+  const score = market * 25 + competition * 10 + modelScore * 20 + feasibility * 15 + regulation * 10 + founderFit * 20;
   return { score: Math.round(score), notes, parts };
 }
 

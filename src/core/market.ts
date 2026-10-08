@@ -30,8 +30,7 @@ export function computeMarket(input: MarketSizingInput): MarketResult {
   // Bottom-up TAM is not directly observable; reuse the top-down TAM when available.
   const buTam = Math.max(tdTam, buSam);
 
-  const samMismatch =
-    tdSam > 0 && buSam > 0 ? Math.max(tdSam, buSam) / Math.min(tdSam, buSam) : Number.NaN;
+  const samMismatch = tdSam > 0 && buSam > 0 ? Math.max(tdSam, buSam) / Math.min(tdSam, buSam) : Number.NaN;
 
   const warnings: string[] = [];
   const insights: string[] = [];

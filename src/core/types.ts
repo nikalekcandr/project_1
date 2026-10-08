@@ -2,12 +2,7 @@ import type { CurrencyCode } from "./format";
 
 export type Segment = "b2c" | "b2b" | "b2g" | "b2b2c";
 
-export type GenerationMethod =
-  | "trend_industry"
-  | "model_transplant"
-  | "problem_first"
-  | "scamper"
-  | "ai";
+export type GenerationMethod = "trend_industry" | "model_transplant" | "problem_first" | "scamper" | "ai";
 
 export interface Idea {
   id: string;
@@ -220,14 +215,7 @@ export interface MonteCarloParam {
 }
 
 export type MonteCarloKey =
-  | "arpu"
-  | "cac"
-  | "monthlyChurn"
-  | "grossMargin"
-  | "organicStart"
-  | "marketingStart"
-  | "fixedCosts"
-  | "launchDelay";
+  "arpu" | "cac" | "monthlyChurn" | "grossMargin" | "organicStart" | "marketingStart" | "fixedCosts" | "launchDelay";
 
 export interface MonteCarloConfig {
   runs: number;

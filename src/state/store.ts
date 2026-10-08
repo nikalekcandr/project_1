@@ -134,7 +134,11 @@ function subscribe(listener: () => void) {
 }
 
 export function useStore<T>(selector: (s: AppState) => T): T {
-  return useSyncExternalStore(subscribe, () => selector(state), () => selector(state));
+  return useSyncExternalStore(
+    subscribe,
+    () => selector(state),
+    () => selector(state),
+  );
 }
 
 export function useActiveProject(): Project | null {

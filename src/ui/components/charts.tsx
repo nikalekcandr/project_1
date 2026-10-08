@@ -72,10 +72,7 @@ export function Legend(props: { items: { name: string; color: string; kind?: "li
 function Tooltip(props: { x: number; y: number; width: number; children: ReactNode }) {
   const left = props.x > props.width / 2 ? props.x - 12 : props.x + 12;
   return (
-    <div
-      className="chart-tooltip"
-      style={{ left, top: props.y, transform: props.x > props.width / 2 ? "translateX(-100%)" : undefined }}
-    >
+    <div className="chart-tooltip" style={{ left, top: props.y, transform: props.x > props.width / 2 ? "translateX(-100%)" : undefined }}>
       {props.children}
     </div>
   );
@@ -114,10 +111,9 @@ export function LineChart(props: {
   const [hover, setHover] = useState<number | null>(null);
   const height = props.height ?? 260;
   const n = props.labels.length;
-  const all = [
-    ...props.series.flatMap((s) => s.values),
-    ...(props.bands ?? []).flatMap((b) => [...b.lower, ...b.upper]),
-  ].filter(Number.isFinite);
+  const all = [...props.series.flatMap((s) => s.values), ...(props.bands ?? []).flatMap((b) => [...b.lower, ...b.upper])].filter(
+    Number.isFinite,
+  );
   const ticks = niceTicks(Math.min(0, ...all), Math.max(0, ...all), 5);
   const yMin = ticks[0];
   const yMax = ticks[ticks.length - 1];
@@ -207,7 +203,15 @@ export function LineChart(props: {
                 <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + innerH} stroke="var(--axis)" strokeWidth={1} />
                 {props.series.map((s) =>
                   Number.isFinite(s.values[hover]) ? (
-                    <circle key={s.name} cx={x(hover)} cy={y(s.values[hover])} r={4.5} fill={s.color} stroke="var(--chart-surface)" strokeWidth={2} />
+                    <circle
+                      key={s.name}
+                      cx={x(hover)}
+                      cy={y(s.values[hover])}
+                      r={4.5}
+                      fill={s.color}
+                      stroke="var(--chart-surface)"
+                      strokeWidth={2}
+                    />
                   ) : null,
                 )}
               </g>
@@ -275,9 +279,7 @@ export function BarChart(props: {
   const nCat = props.categories.length;
   const band = innerW / Math.max(1, nCat);
   const contiguous = props.gap === 0;
-  const barW = contiguous
-    ? Math.max(1, band - 2)
-    : Math.min(24, (band * 0.7) / Math.max(1, props.series.length));
+  const barW = contiguous ? Math.max(1, band - 2) : Math.min(24, (band * 0.7) / Math.max(1, props.series.length));
   const groupW = contiguous ? barW : barW * props.series.length + 2 * (props.series.length - 1);
   const labelStep = Math.max(1, Math.ceil(nCat / Math.max(2, Math.floor(innerW / 64))));
 
@@ -342,7 +344,15 @@ export function BarChart(props: {
                 ))}
             {(props.vLines ?? []).map((l, i) => (
               <g key={l.label} pointerEvents="none">
-                <line x1={vx(l.value)} x2={vx(l.value)} y1={PAD.top} y2={PAD.top + innerH} stroke="var(--text-2)" strokeWidth={1} strokeDasharray="3 3" />
+                <line
+                  x1={vx(l.value)}
+                  x2={vx(l.value)}
+                  y1={PAD.top}
+                  y2={PAD.top + innerH}
+                  stroke="var(--text-2)"
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                />
                 <text x={vx(l.value) + 4} y={PAD.top + 10 + i * 13} style={{ fill: "var(--text-2)" }}>
                   {l.label}
                 </text>
@@ -391,12 +401,7 @@ export function RadarChart(props: { axes: { label: string; value: number }[]; ma
       {width > 0 && (
         <svg width={size} height={size}>
           {[0.25, 0.5, 0.75, 1].map((k) => (
-            <polygon
-              key={k}
-              points={props.axes.map((_, i) => pt(i, max * k).join(",")).join(" ")}
-              fill="none"
-              className="grid-line"
-            />
+            <polygon key={k} points={props.axes.map((_, i) => pt(i, max * k).join(",")).join(" ")} fill="none" className="grid-line" />
           ))}
           {props.axes.map((a, i) => {
             const [ex, ey] = pt(i, max);

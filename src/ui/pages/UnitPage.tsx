@@ -51,19 +51,39 @@ export function UnitPage() {
         <div className="stack">
           <Card>
             <div className="grid grid-4">
-              <Stat label="LTV / CAC" tone={toneOf(r.health.ltvToCac)} value={Number.isFinite(r.ltvToCac) ? fmtNumber(r.ltvToCac, 1) : "∞"} sub="цель ≥ 3" />
-              <Stat label="Окупаемость клиента" tone={toneOf(r.health.payback)} value={fmtMonths(r.paybackMonths, true)} sub="цель ≤ 12 мес." />
+              <Stat
+                label="LTV / CAC"
+                tone={toneOf(r.health.ltvToCac)}
+                value={Number.isFinite(r.ltvToCac) ? fmtNumber(r.ltvToCac, 1) : "∞"}
+                sub="цель ≥ 3"
+              />
+              <Stat
+                label="Окупаемость клиента"
+                tone={toneOf(r.health.payback)}
+                value={fmtMonths(r.paybackMonths, true)}
+                sub="цель ≤ 12 мес."
+              />
               <Stat label="LTV" value={money(r.ltv)} sub={`дисконт.: ${money(r.ltvDiscounted)}`} />
               <Stat label="CAC" value={money(r.cac)} sub={u.cacMode === "funnel" ? "из воронки" : "прямой ввод"} />
               <Stat label="ARPU в месяц" value={money(r.arpu)} />
               <Stat label="Валовая прибыль с клиента" value={money(r.contribution)} sub="в месяц" />
               <Stat label="Срок жизни клиента" tone={toneOf(r.health.churn)} value={fmtMonths(r.lifetimeMonths)} />
-              <Stat label="Прибыль с клиента" tone={r.profitPerCustomer > 0 ? "good" : "bad"} value={money(r.profitPerCustomer)} sub="LTV − CAC" />
+              <Stat
+                label="Прибыль с клиента"
+                tone={r.profitPerCustomer > 0 ? "good" : "bad"}
+                value={money(r.profitPerCustomer)}
+                sub="LTV − CAC"
+              />
             </div>
-            <div className={`callout mt-16 ${r.ltvToCac >= 3 && r.paybackMonths <= 18 ? "good" : r.ltvToCac >= 1.5 ? "warn" : "bad"}`}>{r.verdict}</div>
+            <div className={`callout mt-16 ${r.ltvToCac >= 3 && r.paybackMonths <= 18 ? "good" : r.ltvToCac >= 1.5 ? "warn" : "bad"}`}>
+              {r.verdict}
+            </div>
           </Card>
 
-          <Card title="Экономика одного клиента во времени" subtitle="Накопленная валовая прибыль с клиента за вычетом CAC с учётом оттока. Пересечение нуля — момент окупаемости.">
+          <Card
+            title="Экономика одного клиента во времени"
+            subtitle="Накопленная валовая прибыль с клиента за вычетом CAC с учётом оттока. Пересечение нуля — момент окупаемости."
+          >
             <LineChart
               ariaLabel="Накопленная прибыль с одного клиента"
               labels={curve.map((_, i) => i)}
@@ -75,7 +95,10 @@ export function UnitPage() {
             />
           </Card>
 
-          <Card title="Что сильнее всего влияет на прибыль с клиента" subtitle="Каждый параметр меняем на ±20% и смотрим, как меняется LTV − CAC. Верхний рычаг — главный.">
+          <Card
+            title="Что сильнее всего влияет на прибыль с клиента"
+            subtitle="Каждый параметр меняем на ±20% и смотрим, как меняется LTV − CAC. Верхний рычаг — главный."
+          >
             <TornadoChart
               ariaLabel="Анализ чувствительности юнит-экономики"
               rows={tornado}
@@ -90,7 +113,13 @@ export function UnitPage() {
         <div className="stack">
           <Card title="Доход с клиента">
             <div className="stack" style={{ gap: 12 }}>
-              <NumberField label="Средний чек" kind="money" value={u.avgCheck} min={0} onChange={(v) => update((d) => void (d.unit.avgCheck = v))} />
+              <NumberField
+                label="Средний чек"
+                kind="money"
+                value={u.avgCheck}
+                min={0}
+                onChange={(v) => update((d) => void (d.unit.avgCheck = v))}
+              />
               <NumberField
                 label="Покупок в месяц"
                 value={u.purchasesPerMonth}
@@ -128,10 +157,22 @@ export function UnitPage() {
               onChange={(mode) => update((d) => void (d.unit.cacMode = mode))}
             />
             {u.cacMode === "direct" ? (
-              <NumberField label="CAC — стоимость привлечения клиента" kind="money" value={u.cac} min={0} onChange={(v) => update((d) => void (d.unit.cac = v))} />
+              <NumberField
+                label="CAC — стоимость привлечения клиента"
+                kind="money"
+                value={u.cac}
+                min={0}
+                onChange={(v) => update((d) => void (d.unit.cac = v))}
+              />
             ) : (
               <div className="stack" style={{ gap: 12 }}>
-                <NumberField label="Стоимость лида (заявки)" kind="money" value={u.costPerLead} min={0} onChange={(v) => update((d) => void (d.unit.costPerLead = v))} />
+                <NumberField
+                  label="Стоимость лида (заявки)"
+                  kind="money"
+                  value={u.costPerLead}
+                  min={0}
+                  onChange={(v) => update((d) => void (d.unit.costPerLead = v))}
+                />
                 <NumberField
                   label="Конверсия лида в клиента"
                   kind="percent"

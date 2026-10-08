@@ -54,8 +54,16 @@ export function IdeaCard(props: { idea: Idea; saved?: boolean; onSave?: () => vo
         {idea.oneLiner}
       </p>
       <div className="row">
-        {industry && <span className="tag">{industry.emoji} {industry.name}</span>}
-        {model && <span className="tag">{model.emoji} {model.name}</span>}
+        {industry && (
+          <span className="tag">
+            {industry.emoji} {industry.name}
+          </span>
+        )}
+        {model && (
+          <span className="tag">
+            {model.emoji} {model.name}
+          </span>
+        )}
         <span className="tag">{SEGMENTS[idea.segment].split(" — ")[0]}</span>
       </div>
       {idea.scoreNotes && idea.scoreNotes.length > 0 && (
@@ -282,9 +290,7 @@ export function GeneratorPage() {
           ) : (
             <>
               <div className="row-between">
-                <span className="text-2 small">
-                  {ideas.length} идей · отсортированы по экспресс-оценке
-                </span>
+                <span className="text-2 small">{ideas.length} идей · отсортированы по экспресс-оценке</span>
                 <div className="row">
                   <Select
                     compact
@@ -362,9 +368,7 @@ export function GeneratorPage() {
                 ]}
               />
               <details className="disclosure">
-                <summary>
-                  Интересные отрасли {profile.interests.length > 0 && <Badge tone="ok">{profile.interests.length}</Badge>}
-                </summary>
+                <summary>Интересные отрасли {profile.interests.length > 0 && <Badge tone="ok">{profile.interests.length}</Badge>}</summary>
                 <div className="mt-8">
                   <Chips
                     options={INDUSTRIES.map((i) => ({ value: i.id, label: `${i.emoji} ${i.name}` }))}
@@ -413,14 +417,22 @@ export function GeneratorPage() {
                   <details className="disclosure">
                     <summary>Тренды {trends.length > 0 && <Badge tone="ok">{trends.length}</Badge>}</summary>
                     <div className="mt-8">
-                      <Chips options={TRENDS.map((t) => ({ value: t.id, label: `${t.emoji} ${t.name}` }))} selected={trends} onChange={setTrends} />
+                      <Chips
+                        options={TRENDS.map((t) => ({ value: t.id, label: `${t.emoji} ${t.name}` }))}
+                        selected={trends}
+                        onChange={setTrends}
+                      />
                     </div>
                   </details>
                 )}
                 <details className="disclosure">
                   <summary>Бизнес-модели {models.length > 0 && <Badge tone="ok">{models.length}</Badge>}</summary>
                   <div className="mt-8">
-                    <Chips options={BUSINESS_MODELS.map((m) => ({ value: m.id, label: `${m.emoji} ${m.name}` }))} selected={models} onChange={setModels} />
+                    <Chips
+                      options={BUSINESS_MODELS.map((m) => ({ value: m.id, label: `${m.emoji} ${m.name}` }))}
+                      selected={models}
+                      onChange={setModels}
+                    />
                   </div>
                 </details>
                 {(industries.length > 0 || trends.length > 0 || models.length > 0 || segments.length > 0) && (

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { fmtNumber } from "../../core/format";
+import { hostDownloads, isHosted } from "../../platform";
 
 export function PageHeader(props: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
@@ -13,13 +14,7 @@ export function PageHeader(props: { title: ReactNode; subtitle?: ReactNode; acti
   );
 }
 
-export function Card(props: {
-  title?: ReactNode;
-  subtitle?: ReactNode;
-  actions?: ReactNode;
-  children?: ReactNode;
-  className?: string;
-}) {
+export function Card(props: { title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children?: ReactNode; className?: string }) {
   return (
     <section className={`card ${props.className ?? ""}`}>
       {(props.title || props.actions) && (
@@ -314,7 +309,14 @@ export function Stat(props: { label: ReactNode; value: ReactNode; sub?: ReactNod
 export function Progress(props: { value: number; label?: string }) {
   const pct = Math.max(0, Math.min(100, props.value * 100));
   return (
-    <div className="progress" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={props.label}>
+    <div
+      className="progress"
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={props.label}
+    >
       <div style={{ width: `${pct}%` }} />
     </div>
   );
@@ -342,7 +344,14 @@ export function Modal(props: { title: ReactNode; onClose: () => void; children: 
   }, []);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} ref={ref} style={props.wide ? { width: "min(980px, 100%)" } : undefined}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        ref={ref}
+        style={props.wide ? { width: "min(980px, 100%)" } : undefined}
+      >
         <div className="modal-header">
           <h2>{props.title}</h2>
           <button className="btn ghost icon" onClick={props.onClose} aria-label="Закрыть">
@@ -365,10 +374,13 @@ export function toast(text: string, kind: ToastItem["kind"] = "info") {
   const item = { id: Date.now() + Math.random(), text, kind };
   toastItems = [...toastItems, item];
   toastListener?.(toastItems);
-  setTimeout(() => {
-    toastItems = toastItems.filter((t) => t.id !== item.id);
-    toastListener?.(toastItems);
-  }, kind === "error" ? 6000 : 3200);
+  setTimeout(
+    () => {
+      toastItems = toastItems.filter((t) => t.id !== item.id);
+      toastListener?.(toastItems);
+    },
+    kind === "error" ? 6000 : 3200,
+  );
 }
 
 export function Toasts() {
@@ -390,7 +402,70 @@ export function Toasts() {
   );
 }
 
-export function downloadFile(name: string, content: string, type = "text/plain") {
+/* ---------- Confirm dialog (native confirm() is unavailable inside the claude.ai viewer) ---------- */
+
+interface ConfirmRequest {
+  title: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  resolve: (ok: boolean) => void;
+}
+
+let confirmListener: ((r: ConfirmRequest | null) => void) | null = null;
+
+export function confirmDialog(opts: Omit<ConfirmRequest, "resolve">): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!confirmListener) return resolve(false);
+    confirmListener({ ...opts, resolve });
+  });
+}
+
+export function ConfirmHost() {
+  const [req, setReq] = useState<ConfirmRequest | null>(null);
+  useEffect(() => {
+    confirmListener = setReq;
+    return () => {
+      confirmListener = null;
+    };
+  }, []);
+  if (!req) return null;
+  const close = (ok: boolean) => {
+    req.resolve(ok);
+    setReq(null);
+  };
+  return (
+    <Modal title={req.title} onClose={() => close(false)}>
+      <div className="text-2">{req.message}</div>
+      <div className="row mt-16">
+        <button className={`btn ${req.danger ? "danger" : "primary"}`} autoFocus onClick={() => close(true)}>
+          {req.confirmLabel ?? "Подтвердить"}
+        </button>
+        <button className="btn ghost" onClick={() => close(false)}>
+          {req.cancelLabel ?? "Отмена"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Saves a generated file: through the viewer's save dialog when hosted, as a regular download otherwise. */
+export async function downloadFile(name: string, content: string, type = "text/plain") {
+  if (isHosted) {
+    const downloads = hostDownloads();
+    if (!downloads) {
+      toast("Сохранение файлов недоступно в этом просмотре — используйте «Копировать»", "error");
+      return;
+    }
+    try {
+      await downloads.save({ filename: name, data: content });
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      if (code !== "declined") toast("Не удалось сохранить файл", "error");
+    }
+    return;
+  }
   const blob = new Blob([content], { type: `${type};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

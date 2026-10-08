@@ -31,9 +31,45 @@ export function FinancePage() {
   const lastYear = fin.years[fin.years.length - 1];
 
   const exportCsv = () => {
-    const header = ["Месяц", "Новых клиентов", "Активных клиентов", "Выручка", "Себестоимость", "Валовая прибыль", "Маркетинг", "ФОТ", "Прочие расходы", "EBITDA", "Амортизация", "Налоги", "Чистая прибыль", "Капвложения", "Финансирование", "Свободный денежный поток", "Остаток денег"];
+    const header = [
+      "Месяц",
+      "Новых клиентов",
+      "Активных клиентов",
+      "Выручка",
+      "Себестоимость",
+      "Валовая прибыль",
+      "Маркетинг",
+      "ФОТ",
+      "Прочие расходы",
+      "EBITDA",
+      "Амортизация",
+      "Налоги",
+      "Чистая прибыль",
+      "Капвложения",
+      "Финансирование",
+      "Свободный денежный поток",
+      "Остаток денег",
+    ];
     const rows = fin.rows.map((r) =>
-      [r.month, r.newCustomers, r.activeCustomers, r.revenue, r.cogs, r.grossProfit, r.marketing, r.payroll, r.opex, r.ebitda, r.depreciation, r.tax, r.netIncome, r.capex, r.funding, r.freeCashFlow, r.cash]
+      [
+        r.month,
+        r.newCustomers,
+        r.activeCustomers,
+        r.revenue,
+        r.cogs,
+        r.grossProfit,
+        r.marketing,
+        r.payroll,
+        r.opex,
+        r.ebitda,
+        r.depreciation,
+        r.tax,
+        r.netIncome,
+        r.capex,
+        r.funding,
+        r.freeCashFlow,
+        r.cash,
+      ]
         .map((v) => (typeof v === "number" ? v.toFixed(2).replace(".", ",") : v))
         .join(";"),
     );
@@ -54,19 +90,41 @@ export function FinancePage() {
 
       <Card>
         <div className="grid grid-4">
-          <Stat label="Операционная безубыточность" tone={fin.breakEvenMonth ? "good" : "bad"} value={fin.breakEvenMonth ? `${fin.breakEvenMonth}-й мес.` : "нет"} sub="EBITDA ≥ 0 три месяца подряд" />
-          <Stat label="Пиковая потребность в деньгах" value={money(fin.fundingNeed)} sub={`мин. остаток ${money(fin.minCash)} (мес. ${fin.minCashMonth})`} />
+          <Stat
+            label="Операционная безубыточность"
+            tone={fin.breakEvenMonth ? "good" : "bad"}
+            value={fin.breakEvenMonth ? `${fin.breakEvenMonth}-й мес.` : "нет"}
+            sub="EBITDA ≥ 0 три месяца подряд"
+          />
+          <Stat
+            label="Пиковая потребность в деньгах"
+            value={money(fin.fundingNeed)}
+            sub={`мин. остаток ${money(fin.minCash)} (мес. ${fin.minCashMonth})`}
+          />
           <Stat
             label="Хватит ли денег"
             tone={fin.fundingGap > 0 ? "bad" : "good"}
             value={fin.fundingGap > 0 ? `дефицит ${money(fin.fundingGap)}` : "хватает"}
             sub={fin.runwayMonths !== null ? `деньги кончатся на ${fin.runwayMonths + 1}-м мес.` : "с учётом раундов"}
           />
-          <Stat label={`Выручка, год ${lastYear?.year ?? "—"}`} value={money(lastYear?.revenue ?? 0)} sub={`MRR в конце: ${money(fin.endMrr)}`} />
-          <Stat label="NPV" tone={fin.npv > 0 ? "good" : "bad"} value={money(fin.npv)} sub={`ставка ${fmtPercent(f.discountRateYear)}, с терминальной стоимостью`} />
+          <Stat
+            label={`Выручка, год ${lastYear?.year ?? "—"}`}
+            value={money(lastYear?.revenue ?? 0)}
+            sub={`MRR в конце: ${money(fin.endMrr)}`}
+          />
+          <Stat
+            label="NPV"
+            tone={fin.npv > 0 ? "good" : "bad"}
+            value={money(fin.npv)}
+            sub={`ставка ${fmtPercent(f.discountRateYear)}, с терминальной стоимостью`}
+          />
           <Stat label="IRR (годовая)" value={fin.irrAnnual === null ? "—" : fmtPercent(fin.irrAnnual)} />
           <Stat label="Окупаемость вложений" value={fin.paybackMonth ? `${fin.paybackMonth}-й мес.` : "за горизонтом"} />
-          <Stat label="Клиентов в конце" value={fmtNumber(fin.endCustomers)} sub={`команда: ${fin.rows[fin.rows.length - 1]?.headcount ?? 0} чел.`} />
+          <Stat
+            label="Клиентов в конце"
+            value={fmtNumber(fin.endCustomers)}
+            sub={`команда: ${fin.rows[fin.rows.length - 1]?.headcount ?? 0} чел.`}
+          />
         </div>
       </Card>
 
@@ -93,36 +151,119 @@ export function FinancePage() {
                   onChange={(v) => set("horizonMonths", Number(v))}
                   options={[24, 36, 48, 60].map((n) => ({ value: String(n), label: `${n} месяцев (${n / 12} года)` }))}
                 />
-                <NumberField label="Месяц запуска продаж" value={f.launchMonth} digits={0} min={1} max={f.horizonMonths} hint="До запуска — только разработка и расходы" onChange={(v) => set("launchMonth", Math.round(v))} />
-                <NumberField label="Стартовый капитал" kind="money" value={f.startingCash} min={0} hint="Собственные деньги основателей" onChange={(v) => set("startingCash", v)} />
+                <NumberField
+                  label="Месяц запуска продаж"
+                  value={f.launchMonth}
+                  digits={0}
+                  min={1}
+                  max={f.horizonMonths}
+                  hint="До запуска — только разработка и расходы"
+                  onChange={(v) => set("launchMonth", Math.round(v))}
+                />
+                <NumberField
+                  label="Стартовый капитал"
+                  kind="money"
+                  value={f.startingCash}
+                  min={0}
+                  hint="Собственные деньги основателей"
+                  onChange={(v) => set("startingCash", v)}
+                />
               </div>
             </Card>
             <Card title="Выручка">
               <div className="stack" style={{ gap: 12 }}>
                 <NumberField label="ARPU — доход с клиента в месяц" kind="money" value={f.arpu} min={0} onChange={(v) => set("arpu", v)} />
-                <NumberField label="Рост цен в год" kind="percent" value={f.priceGrowthPerYear} onChange={(v) => set("priceGrowthPerYear", v)} />
-                <NumberField label="Валовая маржа" kind="percent" value={f.grossMargin} min={0} max={1} onChange={(v) => set("grossMargin", v)} />
-                <NumberField label="Отток клиентов в месяц" kind="percent" value={f.monthlyChurn} min={0} max={1} hint="100% — разовые продажи без повторов" onChange={(v) => set("monthlyChurn", v)} />
+                <NumberField
+                  label="Рост цен в год"
+                  kind="percent"
+                  value={f.priceGrowthPerYear}
+                  onChange={(v) => set("priceGrowthPerYear", v)}
+                />
+                <NumberField
+                  label="Валовая маржа"
+                  kind="percent"
+                  value={f.grossMargin}
+                  min={0}
+                  max={1}
+                  onChange={(v) => set("grossMargin", v)}
+                />
+                <NumberField
+                  label="Отток клиентов в месяц"
+                  kind="percent"
+                  value={f.monthlyChurn}
+                  min={0}
+                  max={1}
+                  hint="100% — разовые продажи без повторов"
+                  onChange={(v) => set("monthlyChurn", v)}
+                />
               </div>
             </Card>
             <Card title="Привлечение клиентов">
               <div className="stack" style={{ gap: 12 }}>
-                <NumberField label="Маркетинг на старте, в месяц" kind="money" value={f.marketingStart} min={0} onChange={(v) => set("marketingStart", v)} />
+                <NumberField
+                  label="Маркетинг на старте, в месяц"
+                  kind="money"
+                  value={f.marketingStart}
+                  min={0}
+                  onChange={(v) => set("marketingStart", v)}
+                />
                 <div className="grid grid-2" style={{ gap: 10 }}>
-                  <NumberField label="Рост бюджета в месяц" kind="percent" value={f.marketingGrowth} min={0} onChange={(v) => set("marketingGrowth", v)} />
-                  <NumberField label="Потолок бюджета" kind="money" value={f.marketingMax} min={0} onChange={(v) => set("marketingMax", v)} />
+                  <NumberField
+                    label="Рост бюджета в месяц"
+                    kind="percent"
+                    value={f.marketingGrowth}
+                    min={0}
+                    onChange={(v) => set("marketingGrowth", v)}
+                  />
+                  <NumberField
+                    label="Потолок бюджета"
+                    kind="money"
+                    value={f.marketingMax}
+                    min={0}
+                    onChange={(v) => set("marketingMax", v)}
+                  />
                 </div>
                 <div className="grid grid-2" style={{ gap: 10 }}>
                   <NumberField label="CAC" kind="money" value={f.cac} min={0} onChange={(v) => set("cac", v)} />
-                  <NumberField label="Рост CAC в год" kind="percent" value={f.cacGrowthPerYear} onChange={(v) => set("cacGrowthPerYear", v)} />
+                  <NumberField
+                    label="Рост CAC в год"
+                    kind="percent"
+                    value={f.cacGrowthPerYear}
+                    onChange={(v) => set("cacGrowthPerYear", v)}
+                  />
                 </div>
                 <div className="grid grid-2" style={{ gap: 10 }}>
-                  <NumberField label="Органика на старте, клиентов/мес" value={f.organicStart} min={0} onChange={(v) => set("organicStart", v)} />
-                  <NumberField label="Рост органики в месяц" kind="percent" value={f.organicGrowth} onChange={(v) => set("organicGrowth", v)} />
+                  <NumberField
+                    label="Органика на старте, клиентов/мес"
+                    value={f.organicStart}
+                    min={0}
+                    onChange={(v) => set("organicStart", v)}
+                  />
+                  <NumberField
+                    label="Рост органики в месяц"
+                    kind="percent"
+                    value={f.organicGrowth}
+                    onChange={(v) => set("organicGrowth", v)}
+                  />
                 </div>
                 <div className="grid grid-2" style={{ gap: 10 }}>
-                  <NumberField label="Рекомендации" kind="percent" value={f.referralRate} min={0} max={1} hint="Новых клиентов на одного активного в месяц" onChange={(v) => set("referralRate", v)} />
-                  <NumberField label="Клиентов на старте" value={f.initialCustomers} digits={0} min={0} hint="Предзаказы, пилоты" onChange={(v) => set("initialCustomers", v)} />
+                  <NumberField
+                    label="Рекомендации"
+                    kind="percent"
+                    value={f.referralRate}
+                    min={0}
+                    max={1}
+                    hint="Новых клиентов на одного активного в месяц"
+                    onChange={(v) => set("referralRate", v)}
+                  />
+                  <NumberField
+                    label="Клиентов на старте"
+                    value={f.initialCustomers}
+                    digits={0}
+                    min={0}
+                    hint="Предзаказы, пилоты"
+                    onChange={(v) => set("initialCustomers", v)}
+                  />
                 </div>
               </div>
             </Card>
@@ -142,7 +283,14 @@ export function FinancePage() {
               ]}
             />
             <div className="mt-16" style={{ maxWidth: 260 }}>
-              <NumberField label="Страховые взносы работодателя" kind="percent" value={f.payrollTax} min={0} max={1} onChange={(v) => set("payrollTax", v)} />
+              <NumberField
+                label="Страховые взносы работодателя"
+                kind="percent"
+                value={f.payrollTax}
+                min={0}
+                max={1}
+                onChange={(v) => set("payrollTax", v)}
+              />
             </div>
           </Card>
 
@@ -222,8 +370,24 @@ export function FinancePage() {
                   </div>
                 )}
                 <div className="grid grid-2" style={{ gap: 10 }}>
-                  <NumberField label="Ставка дисконтирования" kind="percent" value={f.discountRateYear} min={0} max={2} hint="Для NPV; для стартапов 25–50%" onChange={(v) => set("discountRateYear", v)} />
-                  <NumberField label="Мультипликатор выхода" value={f.exitMultiple} min={0} max={50} suffix="× EBITDA" hint="Терминальная стоимость; 0 — не учитывать" onChange={(v) => set("exitMultiple", v)} />
+                  <NumberField
+                    label="Ставка дисконтирования"
+                    kind="percent"
+                    value={f.discountRateYear}
+                    min={0}
+                    max={2}
+                    hint="Для NPV; для стартапов 25–50%"
+                    onChange={(v) => set("discountRateYear", v)}
+                  />
+                  <NumberField
+                    label="Мультипликатор выхода"
+                    value={f.exitMultiple}
+                    min={0}
+                    max={50}
+                    suffix="× EBITDA"
+                    hint="Терминальная стоимость; 0 — не учитывать"
+                    onChange={(v) => set("exitMultiple", v)}
+                  />
                 </div>
               </div>
             </Card>
@@ -348,7 +512,19 @@ export function FinancePage() {
                 <table className="table">
                   <thead>
                     <tr>
-                      {["Мес.", "Клиенты", "Выручка", "Валовая приб.", "Маркетинг", "ФОТ", "Прочие", "EBITDA", "Чистая приб.", "Поток денег", "Остаток"].map((h) => (
+                      {[
+                        "Мес.",
+                        "Клиенты",
+                        "Выручка",
+                        "Валовая приб.",
+                        "Маркетинг",
+                        "ФОТ",
+                        "Прочие",
+                        "EBITDA",
+                        "Чистая приб.",
+                        "Поток денег",
+                        "Остаток",
+                      ].map((h) => (
                         <th key={h} className="num">
                           {h}
                         </th>
@@ -360,7 +536,17 @@ export function FinancePage() {
                       <tr key={r.month}>
                         <td className="num">{r.month}</td>
                         <td className="num">{fmtNumber(r.activeCustomers)}</td>
-                        {[r.revenue, r.grossProfit, r.marketing, r.payroll, r.opex, r.ebitda, r.netIncome, r.freeCashFlow + r.funding, r.cash].map((v, i) => (
+                        {[
+                          r.revenue,
+                          r.grossProfit,
+                          r.marketing,
+                          r.payroll,
+                          r.opex,
+                          r.ebitda,
+                          r.netIncome,
+                          r.freeCashFlow + r.funding,
+                          r.cash,
+                        ].map((v, i) => (
                           <td key={i} className={`num ${v < 0 ? "neg" : ""}`}>
                             {money(v)}
                           </td>
@@ -377,7 +563,10 @@ export function FinancePage() {
 
       {tab === "scenarios" && (
         <div className="stack">
-          <Card title="Остаток денег по сценариям" subtitle="Пессимистичный: ARPU −15%, CAC +30%, отток +30%, органика −40%, запуск на 2 мес. позже. Оптимистичный: ARPU +10%, CAC −20%, отток −20%, органика +40%.">
+          <Card
+            title="Остаток денег по сценариям"
+            subtitle="Пессимистичный: ARPU −15%, CAC +30%, отток +30%, органика −40%, запуск на 2 мес. позже. Оптимистичный: ARPU +10%, CAC −20%, отток −20%, органика +40%."
+          >
             <LineChart
               ariaLabel="Остаток денег в трёх сценариях"
               labels={months}
@@ -466,7 +655,8 @@ export function FinancePage() {
               </table>
             </div>
             <p className="small text-2 mt-8">
-              Хотите увидеть не три сценария, а тысячи? Откройте <a href="#/montecarlo">Монте-Карло</a> — там видно вероятность каждого исхода.
+              Хотите увидеть не три сценария, а тысячи? Откройте <a href="#/montecarlo">Монте-Карло</a> — там видно вероятность каждого
+              исхода.
             </p>
           </Card>
         </div>

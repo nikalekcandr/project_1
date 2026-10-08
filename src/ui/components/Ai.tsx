@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AiError, isAiConfigured } from "../../ai/client";
+import { isHosted, usePlatformVersion } from "../../platform";
 import { useStore } from "../../state/store";
 import { navigate } from "../router";
 import { Markdown } from "./Markdown";
@@ -50,6 +51,7 @@ export function useAiTask() {
 /** Button that runs an AI action — or explains how to enable AI if no key is configured. */
 export function AiButton(props: { onClick: () => void; loading?: boolean; children: ReactNode; small?: boolean; title?: string }) {
   useStore((s) => s.settings); // re-render when settings change
+  usePlatformVersion();
   const [ask, setAsk] = useState(false);
   return (
     <>
@@ -63,25 +65,33 @@ export function AiButton(props: { onClick: () => void; loading?: boolean; childr
         {props.children}
       </button>
       {ask && (
-        <Modal title="Подключите ИИ" onClose={() => setAsk(false)}>
-          <p>
-            ИИ-функции BizForge работают на <b>Claude</b> от Anthropic. Чтобы их включить, добавьте свой API-ключ в
-            настройках — он хранится только в вашем браузере и отправляется напрямую в Anthropic.
-          </p>
+        <Modal title={isHosted ? "ИИ недоступен" : "Подключите ИИ"} onClose={() => setAsk(false)}>
+          {isHosted ? (
+            <p>
+              ИИ-функции работают через ваш аккаунт claude.ai. Сейчас доступ к Claude в этом просмотре закрыт: войдите в claude.ai или
+              разрешите странице обращаться к Claude, затем откройте её снова.
+            </p>
+          ) : (
+            <p>
+              ИИ-функции BizForge работают на <b>Claude</b> от Anthropic. Чтобы их включить, добавьте свой API-ключ в настройках — он
+              хранится только в вашем браузере и отправляется напрямую в Anthropic.
+            </p>
+          )}
           <p className="text-2 small">
-            Все остальные функции — генератор, оценка, финмодель, Монте-Карло, бизнес-план — работают без ИИ и без
-            интернета.
+            Все остальные функции — генератор, оценка, финмодель, Монте-Карло, бизнес-план — работают без ИИ и без интернета.
           </p>
           <div className="row mt-16">
-            <button
-              className="btn primary"
-              onClick={() => {
-                setAsk(false);
-                navigate("settings");
-              }}
-            >
-              Открыть настройки
-            </button>
+            {!isHosted && (
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setAsk(false);
+                  navigate("settings");
+                }}
+              >
+                Открыть настройки
+              </button>
+            )}
             <button className="btn ghost" onClick={() => setAsk(false)}>
               Позже
             </button>

@@ -11,9 +11,7 @@ export function priorityScore(h: Pick<Hypothesis, "impact" | "confidence" | "eas
 
 export function sortByPriority(hypotheses: Hypothesis[]): Hypothesis[] {
   const statusOrder = { running: 0, untested: 1, validated: 2, invalidated: 3 } as const;
-  return [...hypotheses].sort(
-    (a, b) => statusOrder[a.status] - statusOrder[b.status] || priorityScore(b) - priorityScore(a),
-  );
+  return [...hypotheses].sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || priorityScore(b) - priorityScore(a));
 }
 
 /** Ranks experiment methods for a hypothesis type: strongest evidence per unit of cost and time first. */

@@ -99,7 +99,13 @@ function riskCategory(text: string): RiskCategory {
 
 function initialHypotheses(idea: ProjectIdea): Hypothesis[] {
   const plan: { type: HypothesisType; impact: number; confidence: number; ease: number; metric: string }[] = [
-    { type: "problem", impact: 10, confidence: 4, ease: 8, metric: "≥ 7 из 10 респондентов подтверждают проблему и уже тратят на неё ресурсы" },
+    {
+      type: "problem",
+      impact: 10,
+      confidence: 4,
+      ease: 8,
+      metric: "≥ 7 из 10 респондентов подтверждают проблему и уже тратят на неё ресурсы",
+    },
     { type: "wtp", impact: 9, confidence: 3, ease: 6, metric: "≥ 10 предоплат / ≥ 3 LOI" },
     { type: "channel", impact: 8, confidence: 3, ease: 6, metric: "CAC в тестовом канале ≤ целевого" },
   ];
@@ -150,8 +156,22 @@ export function createProject(idea: Partial<ProjectIdea> & { title: string }, na
       impact: 3,
       mitigation: "",
     })),
-    { id: newId("risk"), title: "Спрос ниже ожидаемого", category: "market", probability: 3, impact: 5, mitigation: "Предпродажи и smoke-тесты до разработки" },
-    { id: newId("risk"), title: "Кассовый разрыв", category: "finance", probability: 3, impact: 5, mitigation: "Ежемесячный прогноз движения денег, резерв на 3–6 месяцев" },
+    {
+      id: newId("risk"),
+      title: "Спрос ниже ожидаемого",
+      category: "market",
+      probability: 3,
+      impact: 5,
+      mitigation: "Предпродажи и smoke-тесты до разработки",
+    },
+    {
+      id: newId("risk"),
+      title: "Кассовый разрыв",
+      category: "finance",
+      probability: 3,
+      impact: 5,
+      mitigation: "Ежемесячный прогноз движения денег, резерв на 3–6 месяцев",
+    },
   ];
 
   const now = Date.now();
@@ -285,10 +305,46 @@ export function demoProject(): Project {
     bottomUp: { targetCustomers: 6000, pricePerPurchase: 5900, purchasesPerYear: 12, reachShare: 0.6, conversionShare: 0.17 },
   };
   p.competitors = [
-    { id: newId("cmp"), name: "Отраслевые CRM для фитнеса", kind: "direct", price: "3–15 тыс. ₽/мес", strengths: "Уже стоят в клубах, учёт абонементов", weaknesses: "Нет прогноза оттока, только отчёты", x: 6, y: 4 },
-    { id: newId("cmp"), name: "Универсальные CRM", kind: "indirect", price: "2–10 тыс. ₽/мес", strengths: "Гибкие воронки и рассылки", weaknesses: "Не знают специфику фитнеса, нужна настройка", x: 5, y: 3 },
-    { id: newId("cmp"), name: "Ручной обзвон администраторами", kind: "substitute", price: "Время персонала", strengths: "Бесплатно, личный контакт", weaknesses: "Бессистемно, звонят слишком поздно", x: 1, y: 2 },
-    { id: newId("cmp"), name: "Маркетинговые агентства", kind: "indirect", price: "от 50 тыс. ₽/мес", strengths: "Креатив, рекламные кампании", weaknesses: "Фокус на привлечении, а не удержании; дорого", x: 9, y: 5 },
+    {
+      id: newId("cmp"),
+      name: "Отраслевые CRM для фитнеса",
+      kind: "direct",
+      price: "3–15 тыс. ₽/мес",
+      strengths: "Уже стоят в клубах, учёт абонементов",
+      weaknesses: "Нет прогноза оттока, только отчёты",
+      x: 6,
+      y: 4,
+    },
+    {
+      id: newId("cmp"),
+      name: "Универсальные CRM",
+      kind: "indirect",
+      price: "2–10 тыс. ₽/мес",
+      strengths: "Гибкие воронки и рассылки",
+      weaknesses: "Не знают специфику фитнеса, нужна настройка",
+      x: 5,
+      y: 3,
+    },
+    {
+      id: newId("cmp"),
+      name: "Ручной обзвон администраторами",
+      kind: "substitute",
+      price: "Время персонала",
+      strengths: "Бесплатно, личный контакт",
+      weaknesses: "Бессистемно, звонят слишком поздно",
+      x: 1,
+      y: 2,
+    },
+    {
+      id: newId("cmp"),
+      name: "Маркетинговые агентства",
+      kind: "indirect",
+      price: "от 50 тыс. ₽/мес",
+      strengths: "Креатив, рекламные кампании",
+      weaknesses: "Фокус на привлечении, а не удержании; дорого",
+      x: 9,
+      y: 5,
+    },
   ];
   p.positioning = { xLabel: "Цена →", yLabel: "Глубина аналитики удержания →", selfX: 4, selfY: 9 };
 
@@ -330,12 +386,54 @@ export function demoProject(): Project {
   };
 
   p.risks = [
-    { id: newId("risk"), title: "Клубы не готовы платить за удержание", category: "market", probability: 3, impact: 5, mitigation: "Платные пилоты с оплатой за результат; кейсы с ROI" },
-    { id: newId("risk"), title: "Сложные интеграции с разными CRM", category: "tech", probability: 4, impact: 3, mitigation: "Начать с 2 самых популярных CRM, загрузка выгрузок как запасной вариант" },
-    { id: newId("risk"), title: "CRM-системы сделают аналогичную функцию", category: "competition", probability: 3, impact: 4, mitigation: "Партнёрство вместо конкуренции; фокус на качестве модели и данных" },
-    { id: newId("risk"), title: "Длинный цикл продажи сетям", category: "market", probability: 3, impact: 3, mitigation: "Фокус на независимых клубах, где решение принимает владелец" },
-    { id: newId("risk"), title: "Нарушение требований 152-ФЗ", category: "legal", probability: 2, impact: 4, mitigation: "Обезличивание данных, хранение в РФ, договор поручения обработки" },
-    { id: newId("risk"), title: "Кассовый разрыв до раунда", category: "finance", probability: 3, impact: 5, mitigation: "Годовая предоплата со скидкой, резерв на 4 месяца" },
+    {
+      id: newId("risk"),
+      title: "Клубы не готовы платить за удержание",
+      category: "market",
+      probability: 3,
+      impact: 5,
+      mitigation: "Платные пилоты с оплатой за результат; кейсы с ROI",
+    },
+    {
+      id: newId("risk"),
+      title: "Сложные интеграции с разными CRM",
+      category: "tech",
+      probability: 4,
+      impact: 3,
+      mitigation: "Начать с 2 самых популярных CRM, загрузка выгрузок как запасной вариант",
+    },
+    {
+      id: newId("risk"),
+      title: "CRM-системы сделают аналогичную функцию",
+      category: "competition",
+      probability: 3,
+      impact: 4,
+      mitigation: "Партнёрство вместо конкуренции; фокус на качестве модели и данных",
+    },
+    {
+      id: newId("risk"),
+      title: "Длинный цикл продажи сетям",
+      category: "market",
+      probability: 3,
+      impact: 3,
+      mitigation: "Фокус на независимых клубах, где решение принимает владелец",
+    },
+    {
+      id: newId("risk"),
+      title: "Нарушение требований 152-ФЗ",
+      category: "legal",
+      probability: 2,
+      impact: 4,
+      mitigation: "Обезличивание данных, хранение в РФ, договор поручения обработки",
+    },
+    {
+      id: newId("risk"),
+      title: "Кассовый разрыв до раунда",
+      category: "finance",
+      probability: 3,
+      impact: 5,
+      mitigation: "Годовая предоплата со скидкой, резерв на 4 месяца",
+    },
   ];
   p.swot = {
     strengths: ["Отраслевая экспертиза основателя", "Масштабируемая SaaS-модель с высокой маржой", "Измеримый ROI для клиента"],

@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { disableHostSample, hostSample, isHosted, type HostSampleError } from "../platform";
 import { getApiKey, getState, type AiModel } from "../state/store";
 
 export interface AiMessage {
@@ -31,14 +32,21 @@ export const AI_MODELS: { id: AiModel; label: string; hint: string }[] = [
   { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", hint: "Самая быстрая и экономичная" },
 ];
 
+/** Inside the claude.ai viewer Claude is reached through the viewer's own account; elsewhere through an API key. */
+export function aiMode(): "host" | "key" | "none" {
+  if (isHosted) return hostSample() ? "host" : "none";
+  return getApiKey().trim() ? "key" : "none";
+}
+
 export function isAiConfigured(): boolean {
-  return getApiKey().trim().length > 0;
+  return aiMode() !== "none";
 }
 
 /** Server-side refusal fallback is available for Opus 5.5 and Sonnet 5.5 on the Claude API. */
 const SUPPORTS_FALLBACK: AiModel[] = ["claude-opus-5-5", "claude-sonnet-5-5"];
 
 export async function completeAi(req: AiRequest): Promise<string> {
+  if (isHosted) return (await completeViaHost(req, false)) as string;
   const apiKey = getApiKey().trim();
   if (!apiKey) throw new AiError("Добавьте API-ключ Anthropic в настройках, чтобы включить ИИ-функции.", "no_key");
   const { aiModel, aiEffort } = getState().settings;
@@ -57,9 +65,7 @@ export async function completeAi(req: AiRequest): Promise<string> {
       effort: aiEffort,
       ...(req.schema ? { format: { type: "json_schema", schema: req.schema } } : {}),
     },
-    ...(SUPPORTS_FALLBACK.includes(aiModel)
-      ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const }
-      : {}),
+    ...(SUPPORTS_FALLBACK.includes(aiModel) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
   };
 
   try {
@@ -98,10 +104,84 @@ function toAiError(error: unknown, Sdk: typeof Anthropic): AiError {
 
 /** Runs a structured-output request and parses the JSON. */
 export async function completeJson<T>(req: AiRequest & { schema: Record<string, unknown> }): Promise<T> {
+  if (isHosted) return checkShape(await completeViaHost(req, true), req.schema) as T;
   const text = await completeAi(req);
   try {
     return JSON.parse(text) as T;
   } catch {
     throw new AiError("Модель вернула некорректный JSON. Попробуйте ещё раз.", "api");
   }
+}
+
+const TIER = { low: "quick", medium: "default", high: "complex" } as const;
+
+/** Claude via the artifact viewer: no system prompt, so instructions go in a leading user turn. */
+async function completeViaHost(req: AiRequest, json: boolean): Promise<unknown> {
+  const sample = hostSample();
+  if (!sample) {
+    throw new AiError("ИИ недоступен в этом просмотре: войдите в claude.ai и разрешите странице обращаться к Claude.", "no_key");
+  }
+  const turns = [{ role: "user" as const, content: `Инструкции для тебя:\n${req.system}` }, ...req.messages];
+  if (json && req.schema) {
+    const last = turns[turns.length - 1];
+    turns[turns.length - 1] = {
+      ...last,
+      content: `${last.content}\n\nОтветь только одним JSON-значением без пояснений, строго по этой JSON-схеме:\n${JSON.stringify(req.schema)}`,
+    };
+  }
+  const options = {
+    signal: req.signal,
+    modelTier: TIER[getState().settings.aiEffort],
+    // A chat must always get a fresh answer; one-shot analyses may replay a recent identical answer.
+    cache: req.messages.length <= 1,
+    onText: req.onText ? ({ text }: { text: string }) => req.onText?.(text) : undefined,
+  };
+  try {
+    if (json) return await sample.json(turns, options);
+    return (await sample(turns, options)).text;
+  } catch (e) {
+    throw fromHostError(e as HostSampleError);
+  }
+}
+
+function fromHostError(e: HostSampleError): AiError {
+  switch (e?.code) {
+    case "cancelled":
+      return new AiError("Запрос отменён.", "aborted");
+    case "not_granted":
+    case "sampling_disabled":
+    case "not_declared":
+    case "capability_disabled":
+    case "capability_removed":
+      disableHostSample();
+      return new AiError("Доступ к Claude для этой страницы не разрешён — ИИ-функции отключены в этом просмотре.", "auth");
+    case "rate_limited":
+      return new AiError("Слишком много запросов к Claude. Подождите немного и повторите.", "rate_limit");
+    case "session_expired":
+      return new AiError("Сессия claude.ai истекла — войдите снова.", "auth");
+    case "refused":
+      return new AiError("Claude отказался выполнять этот запрос. Попробуйте переформулировать.", "refusal");
+    case "invalid_json":
+      return new AiError("Claude вернул ответ не в том формате. Попробуйте ещё раз.", "api");
+    case "prompt_too_large":
+      return new AiError("Проект слишком большой для одного запроса. Сократите тексты и повторите.", "api");
+    default:
+      return new AiError("Не удалось получить ответ Claude. Повторите попытку.", "network");
+  }
+}
+
+/** Light runtime check of the top-level shape — the viewer's JSON mode does not enforce schemas. */
+function checkShape(value: unknown, schema: Record<string, unknown>): unknown {
+  const props = (schema.properties ?? {}) as Record<string, { type?: string }>;
+  const ok =
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    ((schema.required as string[] | undefined) ?? []).every((k) => {
+      const v = (value as Record<string, unknown>)[k];
+      const t = props[k]?.type;
+      return t === "array" ? Array.isArray(v) : v !== undefined;
+    });
+  if (!ok) throw new AiError("Ответ Claude не соответствует ожидаемому формату. Попробуйте ещё раз.", "api");
+  return value;
 }

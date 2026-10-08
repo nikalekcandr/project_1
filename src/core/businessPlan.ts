@@ -250,7 +250,12 @@ const sections: Record<PlanSectionId, SectionBuilder> = {
         table(
           ["Метрика", "P10 (плохо)", "P50 (медиана)", "P90 (хорошо)"],
           [
-            ["Потребность в деньгах", money(monteCarlo.fundingNeed.p90), money(monteCarlo.fundingNeed.p50), money(monteCarlo.fundingNeed.p10)],
+            [
+              "Потребность в деньгах",
+              money(monteCarlo.fundingNeed.p90),
+              money(monteCarlo.fundingNeed.p50),
+              money(monteCarlo.fundingNeed.p10),
+            ],
             ["NPV", money(monteCarlo.npv.p10), money(monteCarlo.npv.p50), money(monteCarlo.npv.p90)],
             ["MRR на конец горизонта", money(monteCarlo.endMrr.p10), money(monteCarlo.endMrr.p50), money(monteCarlo.endMrr.p90)],
           ],
@@ -270,7 +275,12 @@ const sections: Record<PlanSectionId, SectionBuilder> = {
       sorted.length
         ? table(
             ["Риск", "Категория", "Уровень", "Меры снижения"],
-            sorted.map((r) => [clean(r.title), RISK_CATEGORIES[r.category], `${RISK_LEVEL_LABELS[riskLevel(riskScore(r))]} (${r.probability}×${r.impact})`, clean(r.mitigation, "—")]),
+            sorted.map((r) => [
+              clean(r.title),
+              RISK_CATEGORIES[r.category],
+              `${RISK_LEVEL_LABELS[riskLevel(riskScore(r))]} (${r.probability}×${r.impact})`,
+              clean(r.mitigation, "—"),
+            ]),
           )
         : "_Риски не добавлены._",
       "",
@@ -290,14 +300,25 @@ const sections: Record<PlanSectionId, SectionBuilder> = {
   },
 
   roadmap: ({ project: p }) => {
-    const statuses = { untested: "Не проверена", running: "В работе", validated: "✅ Подтверждена", invalidated: "❌ Опровергнута" } as const;
+    const statuses = {
+      untested: "Не проверена",
+      running: "В работе",
+      validated: "✅ Подтверждена",
+      invalidated: "❌ Опровергнута",
+    } as const;
     const hyps = sortByPriority(p.hypotheses);
     return [
       "### Ключевые гипотезы",
       hyps.length
         ? table(
             ["Гипотеза", "Тип", "Эксперимент", "Критерий успеха", "Статус"],
-            hyps.map((h) => [clean(h.statement), HYPOTHESIS_TYPES[h.type].label, getExperiment(h.experimentId)?.name ?? "—", clean(h.successMetric, "—"), statuses[h.status]]),
+            hyps.map((h) => [
+              clean(h.statement),
+              HYPOTHESIS_TYPES[h.type].label,
+              getExperiment(h.experimentId)?.name ?? "—",
+              clean(h.successMetric, "—"),
+              statuses[h.status],
+            ]),
           )
         : "_Гипотезы не добавлены._",
       "",

@@ -48,12 +48,7 @@ export function summarizeRisks(risks: Risk[]): RiskSummary {
 }
 
 /** Suggests SWOT items from other modules so the founder doesn't start from a blank page. */
-export function suggestSwot(
-  project: Project,
-  validation: ValidationResult,
-  unit: UnitEconomicsResult,
-  market: MarketResult,
-): Swot {
+export function suggestSwot(project: Project, validation: ValidationResult, unit: UnitEconomicsResult, market: MarketResult): Swot {
   const strengths: string[] = [];
   const weaknesses: string[] = [];
   const opportunities: string[] = [];

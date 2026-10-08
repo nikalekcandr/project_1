@@ -191,7 +191,7 @@ p {
 
 .sidebar {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   height: 100vh;
   overflow-y: auto;
   background: var(--surface);
@@ -291,7 +291,7 @@ p {
 
 .topbar {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 20;
   display: flex;
   align-items: center;
@@ -561,7 +561,9 @@ p {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   min-height: 36px;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .input:focus,

@@ -51,7 +51,15 @@ function renderBlocks(text: string): ReactNode[] {
       const level = heading[1].length;
       const content = renderInline(heading[2], `h${k}`);
       blocks.push(
-        level === 1 ? <h1 key={k++}>{content}</h1> : level === 2 ? <h2 key={k++}>{content}</h2> : level === 3 ? <h3 key={k++}>{content}</h3> : <h4 key={k++}>{content}</h4>,
+        level === 1 ? (
+          <h1 key={k++}>{content}</h1>
+        ) : level === 2 ? (
+          <h2 key={k++}>{content}</h2>
+        ) : level === 3 ? (
+          <h3 key={k++}>{content}</h3>
+        ) : (
+          <h4 key={k++}>{content}</h4>
+        ),
       );
       i++;
       continue;
@@ -106,11 +114,7 @@ function renderBlocks(text: string): ReactNode[] {
       continue;
     }
     const para: string[] = [];
-    while (
-      i < lines.length &&
-      lines[i].trim() &&
-      !/^(#{1,4}\s|>|\||([-*•]|\d+[.)])\s+|-{3,}$)/.test(lines[i].trim())
-    ) {
+    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|>|\||([-*•]|\d+[.)])\s+|-{3,}$)/.test(lines[i].trim())) {
       para.push(lines[i++].trim());
     }
     if (!para.length) {

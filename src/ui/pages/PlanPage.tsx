@@ -5,6 +5,7 @@ import { PLAN_SECTIONS, buildBusinessPlan, buildSection, fundingAsk } from "../.
 import { fmtPercent, slugify } from "../../core/format";
 import { runMonteCarlo, type MonteCarloResult } from "../../core/monteCarlo";
 import { newId } from "../../core/random";
+import { isHosted } from "../../platform";
 import type { Milestone, PlanSectionId } from "../../core/types";
 import { AiButton, AiOutput, useAiTask } from "../components/Ai";
 import { EditableTable } from "../components/EditableTable";
@@ -88,26 +89,28 @@ export function PlanPage() {
   return (
     <>
       <div className="no-print">
-      <PageHeader
-        title="Бизнес-план"
-        subtitle="Собирается автоматически из всех разделов проекта и обновляется при любом изменении. Любой раздел можно переписать вручную или улучшить с ИИ."
-        actions={
-          <>
-            <button className="btn" onClick={() => copyText(markdown)}>
-              Копировать
-            </button>
-            <button className="btn" onClick={() => downloadFile(`${fileBase}.md`, markdown, "text/markdown")}>
-              ⬇ Markdown
-            </button>
-            <button className="btn" onClick={exportHtml}>
-              ⬇ HTML
-            </button>
-            <button className="btn primary" onClick={() => window.print()}>
-              🖨 PDF / печать
-            </button>
-          </>
-        }
-      />
+        <PageHeader
+          title="Бизнес-план"
+          subtitle="Собирается автоматически из всех разделов проекта и обновляется при любом изменении. Любой раздел можно переписать вручную или улучшить с ИИ."
+          actions={
+            <>
+              <button className="btn" onClick={() => copyText(markdown)}>
+                Копировать
+              </button>
+              <button className="btn" onClick={() => downloadFile(`${fileBase}.md`, markdown, "text/markdown")}>
+                ⬇ Markdown
+              </button>
+              <button className="btn" onClick={exportHtml}>
+                ⬇ HTML
+              </button>
+              {!isHosted && (
+                <button className="btn primary" onClick={() => window.print()}>
+                  🖨 PDF / печать
+                </button>
+              )}
+            </>
+          }
+        />
       </div>
 
       <div className="grid grid-side">
@@ -129,7 +132,13 @@ export function PlanPage() {
               {p.plan.fundingAsk == null ? (
                 <div className="stat-value">{money(ask)}</div>
               ) : (
-                <NumberField label="Сумма запроса" kind="money" value={p.plan.fundingAsk} min={0} onChange={(v) => update((d) => void (d.plan.fundingAsk = v))} />
+                <NumberField
+                  label="Сумма запроса"
+                  kind="money"
+                  value={p.plan.fundingAsk}
+                  min={0}
+                  onChange={(v) => update((d) => void (d.plan.fundingAsk = v))}
+                />
               )}
               <div className="field-label">Использование средств</div>
               <div className="grid grid-2" style={{ gap: 8 }}>
@@ -176,7 +185,12 @@ export function PlanPage() {
                     <button className="btn sm ghost" onClick={() => setEditing(s.id)} title="Править вручную">
                       ✎
                     </button>
-                    <AiButton small onClick={() => improveSection(s.id)} loading={sectionAi.loading && improving === s.id} title="Улучшить с ИИ">
+                    <AiButton
+                      small
+                      onClick={() => improveSection(s.id)}
+                      loading={sectionAi.loading && improving === s.id}
+                      title="Улучшить с ИИ"
+                    >
                       {""}
                     </AiButton>
                     {custom && (
@@ -260,7 +274,13 @@ function SectionEditor(props: { id: PlanSectionId; initial: string; onSave: (t: 
           </button>
         </div>
         <div className="grid grid-2">
-          <textarea className="textarea" style={{ minHeight: 420, fontFamily: "var(--mono)", fontSize: 13 }} value={text} onChange={(e) => setText(e.target.value)} aria-label="Текст раздела в Markdown" />
+          <textarea
+            className="textarea"
+            style={{ minHeight: 420, fontFamily: "var(--mono)", fontSize: 13 }}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            aria-label="Текст раздела в Markdown"
+          />
           <div className="card flat" style={{ maxHeight: 420, overflow: "auto" }}>
             <Markdown text={text} />
           </div>

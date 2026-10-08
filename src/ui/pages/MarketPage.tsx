@@ -108,7 +108,11 @@ export function MarketPage() {
         <div className="grid grid-2">
           <Card title="Сверху вниз (top-down)" subtitle="От общего числа потенциальных клиентов к вашей доле.">
             <div className="stack" style={{ gap: 12 }}>
-              <TextField label="География" value={p.market.geography} onChange={(geography) => update((d) => void (d.market.geography = geography))} />
+              <TextField
+                label="География"
+                value={p.market.geography}
+                onChange={(geography) => update((d) => void (d.market.geography = geography))}
+              />
               <div className="form-grid">
                 <NumberField
                   label="Всего потенциальных клиентов"
@@ -253,7 +257,14 @@ export function MarketPage() {
                   <button
                     className="btn sm"
                     onClick={() => {
-                      update((d) => void (d.validation.market_size = { score: marketSizeToScore(sam), evidence: "research", note: `SAM ≈ ${money(sam)} (расчёт)` }));
+                      update(
+                        (d) =>
+                          void (d.validation.market_size = {
+                            score: marketSizeToScore(sam),
+                            evidence: "research",
+                            note: `SAM ≈ ${money(sam)} (расчёт)`,
+                          }),
+                      );
                       toast("Оценка рынка перенесена в «Оценку идеи»");
                     }}
                   >
@@ -323,15 +334,37 @@ export function MarketPage() {
               ]}
             />
             <div className="stack" style={{ gap: 12 }}>
-              <TextField label="Ось X" value={p.positioning.xLabel} onChange={(xLabel) => update((d) => void (d.positioning.xLabel = xLabel))} />
-              <TextField label="Ось Y" value={p.positioning.yLabel} onChange={(yLabel) => update((d) => void (d.positioning.yLabel = yLabel))} />
+              <TextField
+                label="Ось X"
+                value={p.positioning.xLabel}
+                onChange={(xLabel) => update((d) => void (d.positioning.xLabel = xLabel))}
+              />
+              <TextField
+                label="Ось Y"
+                value={p.positioning.yLabel}
+                onChange={(yLabel) => update((d) => void (d.positioning.yLabel = yLabel))}
+              />
               <label className="field">
                 <span className="field-label">Наша позиция по X: {p.positioning.selfX}</span>
-                <input type="range" min={0} max={10} step={0.5} value={p.positioning.selfX} onChange={(e) => update((d) => void (d.positioning.selfX = Number(e.target.value)))} />
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={p.positioning.selfX}
+                  onChange={(e) => update((d) => void (d.positioning.selfX = Number(e.target.value)))}
+                />
               </label>
               <label className="field">
                 <span className="field-label">Наша позиция по Y: {p.positioning.selfY}</span>
-                <input type="range" min={0} max={10} step={0.5} value={p.positioning.selfY} onChange={(e) => update((d) => void (d.positioning.selfY = Number(e.target.value)))} />
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={p.positioning.selfY}
+                  onChange={(e) => update((d) => void (d.positioning.selfY = Number(e.target.value)))}
+                />
               </label>
             </div>
           </div>

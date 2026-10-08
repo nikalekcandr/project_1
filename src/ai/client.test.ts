@@ -5,7 +5,22 @@ import { AiError, completeAi, completeJson } from "./client";
 
 function sseResponse(text: string, stopReason = "end_turn"): Response {
   const events: [string, unknown][] = [
-    ["message_start", { type: "message_start", message: { id: "msg_1", type: "message", role: "assistant", model: "claude-opus-5-5", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 1 } } }],
+    [
+      "message_start",
+      {
+        type: "message_start",
+        message: {
+          id: "msg_1",
+          type: "message",
+          role: "assistant",
+          model: "claude-opus-5-5",
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 5, output_tokens: 1 },
+        },
+      },
+    ],
     ["content_block_start", { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }],
     ["content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: text.slice(0, 3) } }],
     ["content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: text.slice(3) } }],
@@ -45,7 +60,13 @@ describe("Claude client", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(String(url)).toContain("/v1/messages");
     const body = JSON.parse(String(init.body));
-    expect(body).toMatchObject({ model: "claude-opus-5-5", stream: true, system: "sys", fallbacks: "default", output_config: { effort: "medium" } });
+    expect(body).toMatchObject({
+      model: "claude-opus-5-5",
+      stream: true,
+      system: "sys",
+      fallbacks: "default",
+      output_config: { effort: "medium" },
+    });
     const headers = new Headers(init.headers);
     expect(headers.get("x-api-key")).toBe("sk-ant-test");
     expect(headers.get("anthropic-beta")).toContain("server-side-fallback-2026-07-01");
