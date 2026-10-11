@@ -1187,6 +1187,8 @@ class Tray:
             item("Открыть Генштаб", lambda: app.post(app.show_main), default=True),
             item(lambda _i: "Пауза" if app.pomo.running else "Штурм", lambda: app.post(app.pomo.toggle)),
             item("Записать мысль или факт", lambda: app.post(app.open_capture)),
+            item("Перехват соблазна (ПВО)", lambda: app.post(app.open_urge)),
+            item("Записать трату", lambda: app.post(lambda: app.edit_money(None))),
             item("Построение", lambda: app.post(lambda: app.coach.open_morning())),
             item("Вечерняя сводка", lambda: app.post(app.checkin)),
             item("Пауза дежурного на час", lambda: app.post(lambda: app.coach.pause(60))),
@@ -10500,7 +10502,14 @@ class System(CampaignMixin, KitMixin):
         cards = self.cards_line()
         if cards:
             lines.append(cards)
-        lines.append("Факты — сюда: «+1,5 тервер», «старт эконом» / «стоп», «карточки», «статус», «разведка».")
+        proto = self.protocol_of_day(d)
+        if proto:
+            lines.append(f"Протокол дня: если {lc_first(proto['if'])} — {proto['then']}")
+        sig = [x for x in self.signals() if (parse_dt(x["at"]) or datetime.min).date() == d]
+        if sig:
+            lines.append("Сигналы: " + ", ".join(f"{parse_dt(x['at']):%H:%M} {x['text']}" for x in sig[:5]))
+        lines.append("Факты — сюда: «+1,5 тервер», «старт эконом» / «стоп», «перехват ютуб 4», «трата 350 кафе», "
+                     "«напомни 18:00 …», «статус».")
         return "\n".join(lines)
 
     def cards_line(self):
@@ -13335,7 +13344,7 @@ class TelegramBot:
                 return self.review.finish()
             if word not in ("статус", "status", "план", "plan", "приказ", "отчёт", "отчет", "неделя", "week", "help",
                             "start", "помощь", "разведка", "звание", "наряды", "резерв", "перехват", "устоял",
-                            "сорвался", "трата", "пво", "казна") \
+                            "сорвался", "трата", "пво", "казна", "напомни", "сигналы", "листы", "лист") \
                     and not text.strip().startswith("+"):
                 return self.review.handle(text, when)
         if word in ("карточки", "повтор", "повторение", "cards", "review"):
