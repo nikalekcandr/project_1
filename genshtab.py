@@ -1382,6 +1382,8 @@ DEFAULT_SETTINGS = {
     "system_tab": "overview",
     "last_checkin_prompt": None,
     "last_missed_prompt": None,
+    "hidden_views": [],
+    "discipline_tab": "pvo",
 }
 
 TASK_DEFAULTS = {
@@ -2435,10 +2437,13 @@ class TaskMenu:
 # ───────────────────────── боковая панель ─────────────────────────
 
 class Sidebar(tk.Frame):
-    ITEMS = [("system", "Ставка"), ("focus", "Штурм"), ("tasks", "Приказы"), ("week", "Неделя"),
-             ("projects", "Операции"), ("grades", "Рубежи"), ("notes", "Арсенал"), ("network", "Связи"),
-             ("habits", "Распорядок"), ("log", "Хронометраж"), ("timer", "Таймер"),
-             ("stats", "Аналитика"), ("settings", "Настройки")]
+    ITEMS = [("system", "Ставка"), ("focus", "Штурм"), ("discipline", "Дисциплина"),
+             ("tasks", "Приказы"), ("week", "Неделя"), ("projects", "Операции"),
+             ("grades", "Рубежи"), ("notes", "Арсенал"), ("network", "Связи"),
+             ("habits", "Распорядок"), ("fitness", "Физподготовка"), ("money", "Казна"), ("log", "Хронометраж"),
+             ("timer", "Таймер"), ("stats", "Аналитика"), ("settings", "Настройки")]
+    FIXED = ("system", "settings")  # эти разделы не прячутся
+    GROUPS = {"tasks": "Планы", "grades": None, "habits": "Тыл", "timer": "Снаряжение"}
 
     def __init__(self, app):
         super().__init__(app, bg=C.SIDEBAR, width=app.px(176))
@@ -2446,22 +2451,34 @@ class Sidebar(tk.Frame):
         self.app = app
         self.active = None
         F, px = app.fonts, app.px
-        brand = tk.Frame(self, bg=C.SIDEBAR)
-        brand.pack(fill="x", padx=px(20), pady=(px(18), px(10)))
+        brand = self.brand = tk.Frame(self, bg=C.SIDEBAR)
+        brand.pack(fill="x", padx=px(20), pady=(px(16), px(8)))
         tk.Label(brand, text="★", font=F["brand"], bg=C.SIDEBAR, fg=C.BRASS).pack(side="left")
         tk.Label(brand, text=APP_NAME.upper(), font=F["brand"], bg=C.SIDEBAR, fg=C.SIDE_INK, anchor="w").pack(
             side="left", padx=(px(6), 0))
         self.rows = {}
-        groups = {"tasks": "Планы", "grades": CAMPAIGN, "habits": "Тыл", "timer": "Снаряжение"}
-        for key, text in self.ITEMS:
-            if key in groups:
-                tk.Label(self, text=groups[key].upper(), font=F["tiny"], bg=C.SIDEBAR, fg=C.SIDE_MUTED,
-                         anchor="w").pack(fill="x", padx=px(20), pady=(px(10), px(1)))
-            row = tk.Frame(self, bg=C.SIDEBAR, cursor="hand2")
+        self.group_lbl = None
+        hidden = set(app.store.settings.get("hidden_views") or []) - set(self.FIXED)
+        items = [(k, t) for k, t in self.ITEMS if k not in hidden]
+        shown = {k for k, _t in items}
+        nav = tk.Frame(self, bg=C.SIDEBAR)
+        nav.pack(fill="x")
+        done_groups = set()
+        for key, text in items:
+            # заголовок группы ставится перед первым видимым разделом группы
+            group = next((g for g, members in self._members().items() if key in members), None)
+            if group and group not in done_groups:
+                done_groups.add(group)
+                title = self.GROUPS[group] or app.system.name()
+                lbl = tk.Label(nav, text=title.upper(), font=F["tiny"], bg=C.SIDEBAR, fg=C.SIDE_MUTED, anchor="w")
+                lbl.pack(fill="x", padx=px(20), pady=(px(9), px(1)))
+                if self.GROUPS[group] is None:
+                    self.group_lbl = lbl
+            row = tk.Frame(nav, bg=C.SIDEBAR, cursor="hand2")
             bar = tk.Frame(row, bg=C.SIDEBAR, width=px(3))
             bar.pack(side="left", fill="y")
             lbl = tk.Label(row, text=text, font=F["ui"], bg=C.SIDEBAR, fg=C.SIDE_INK, anchor="w",
-                           padx=px(17), pady=px(5))
+                           padx=px(17), pady=px(3))
             lbl.pack(side="left", fill="x", expand=True)
             row.pack(fill="x")
             for w in (row, lbl):
@@ -2469,19 +2486,56 @@ class Sidebar(tk.Frame):
                 w.bind("<Enter>", lambda e, k=key: self._hover(k, True))
                 w.bind("<Leave>", lambda e, k=key: self._hover(k, False))
             self.rows[key] = (row, bar, lbl)
+        self.shown = shown
+        self.nav = nav
 
-        links = tk.Frame(self, bg=C.SIDEBAR)
-        links.pack(side="bottom", fill="x", padx=px(20), pady=(0, px(18)))
-        for text, cmd in (("Поиск  Ctrl+K", app.open_palette), ("Мини-окно  Ctrl+M", app.open_mini),
-                          ("Все клавиши  F1", lambda: HelpDialog(app))):
-            lbl = tk.Label(links, text=text, font=F["small"], bg=C.SIDEBAR, fg=C.SIDE_MUTED, cursor="hand2",
-                           anchor="w")
-            lbl.pack(fill="x", pady=px(2))
-            lbl.bind("<Button-1>", lambda e, c=cmd: c())
+        self.links = tk.Frame(self, bg=C.SIDEBAR)
+        self.links.pack(side="bottom", fill="x", padx=px(20), pady=(0, px(14)))
+        for line in ((("Поиск  Ctrl+K", app.open_palette), ("  ·  F1", lambda: HelpDialog(app))),
+                     (("Мини-окно  Ctrl+M", app.open_mini),)):
+            row = tk.Frame(self.links, bg=C.SIDEBAR)
+            row.pack(fill="x", pady=px(1))
+            for text, cmd in line:
+                lbl = tk.Label(row, text=text, font=F["small"], bg=C.SIDEBAR, fg=C.SIDE_MUTED, cursor="hand2",
+                               anchor="w")
+                lbl.pack(side="left")
+                lbl.bind("<Button-1>", lambda e, c=cmd: c())
         self.status = tk.Label(self, text="", font=F["small"], bg=C.SIDEBAR, fg=C.SIDE_MUTED, anchor="w",
                                justify="left")
-        self.status.pack(side="bottom", fill="x", padx=px(20), pady=(0, px(14)))
+        self.status.pack(side="bottom", fill="x", padx=px(20), pady=(0, px(10)))
         self._status_text = None
+        self._fit_state = "all"
+        self.bind("<Configure>", self._fit)
+
+    def _members(self):
+        keys = [k for k, _t in self.ITEMS]
+        out, cur = {}, None
+        for k in keys:
+            if k in self.GROUPS:
+                cur = k
+            if cur:
+                out.setdefault(cur, []).append(k)
+        return out
+
+    def _fit(self, _e=None):
+        """Низкое окно: сначала прячется сводка внизу, потом ссылки — меню разделов остаётся целым."""
+        try:
+            h = self.winfo_height()
+            top = self.brand.winfo_reqheight() + self.nav.winfo_reqheight() + self.app.px(28)
+            status_h = self.status.winfo_reqheight() + self.app.px(10)
+            links_h = self.links.winfo_reqheight() + self.app.px(14)
+        except tk.TclError:
+            return
+        state = "all" if top + status_h + links_h <= h else ("links" if top + links_h <= h else "none")
+        if state == self._fit_state:
+            return
+        self._fit_state = state
+        self.status.pack_forget()
+        self.links.pack_forget()
+        if state in ("all", "links"):
+            self.links.pack(side="bottom", fill="x", padx=self.app.px(20), pady=(0, self.app.px(14)))
+        if state == "all":
+            self.status.pack(side="bottom", fill="x", padx=self.app.px(20), pady=(0, self.app.px(10)))
 
     def _paint(self, key, bg, bar):
         row, b, lbl = self.rows[key]
@@ -2496,15 +2550,25 @@ class Sidebar(tk.Frame):
 
     def set_active(self, key):
         self.active = key
+        if key not in self.rows:
+            return self._clear_active()
         for k in self.rows:
             if k == key:
                 self._paint(k, C.SIDE_ACTIVE, C.BRASS)
             else:
                 self._paint(k, C.SIDEBAR, C.SIDEBAR)
 
+    def _clear_active(self):
+        for k in self.rows:
+            self._paint(k, C.SIDEBAR, C.SIDEBAR)
+
     def tick(self):
         app = self.app
         p = app.pomo
+        if self.group_lbl is not None:
+            name = app.system.name().upper()
+            if self.group_lbl.cget("text") != name:
+                self.group_lbl.configure(text=name)
         lines = []
         if p.is_active():
             val = p.display_seconds()
@@ -2526,11 +2590,13 @@ class Sidebar(tk.Frame):
             if time.time() - stamp > 5:
                 score, _p = sysm.day_score(today)
                 r = sysm.rank(today)
-                ny = (date(today.year + 1, 1, 1) - today).days
+                end = sysm.end()
+                left = sysm.days_to_finish(today)
+                finish = (f"До Нового года {(date(end.year + 1, 1, 1) - today).days} дн." if (end.month, end.day) == (12, 31)
+                          else f"До финиша {left} дн.")
                 cached = "\n".join([f"Боеготовность {score}", f"{r['name']}",
                                     f"Резерв {sysm.reserve_left(today)} · нарядов {len(sysm.duties_open())}",
-                                    f"До Нового года {ny} дн."
-                                    + (" · дежурный на паузе" if app.coach.paused() else "")])
+                                    finish + (" · дежурный на паузе" if app.coach.paused() else "")])
                 app._sys_status = (time.time(), cached)
             lines.append(cached)
         elif today < sysm.start():
@@ -2539,8 +2605,11 @@ class Sidebar(tk.Frame):
             lines.append(f"Сегодня {app.pomos_on(today)} из {app.store.settings['daily_goal']}")
         text = "\n".join(lines)
         if text != self._status_text:
+            relayout = self._status_text is None or text.count("\n") != self._status_text.count("\n")
             self._status_text = text
             self.status.configure(text=text)
+            if relayout:
+                self.after_idle(self._fit)
 
 # ───────────────────────── Штурм ─────────────────────────
 
@@ -4368,6 +4437,18 @@ class SettingsView(tk.Frame):
         self.theme_seg = Segmented(right, app, self.THEMES, self._pick_theme)
         self.theme_seg.pack(anchor="w")
 
+        section(right, "Разделы в меню")
+        tk.Label(right, text="Лишнее можно спрятать из меню — данные остаются, раздел открывается через Ctrl+K.",
+                 font=F["small"], bg=C.BG, fg=C.MUTED, anchor="w").pack(fill="x")
+        grid = tk.Frame(right, bg=C.BG)
+        grid.pack(anchor="w", pady=(px(4), 0))
+        self.view_vars = {}
+        shown = [(k, t) for k, t in Sidebar.ITEMS if k not in Sidebar.FIXED]
+        for i, (key, text) in enumerate(shown):
+            v = tk.BooleanVar()
+            ttk.Checkbutton(grid, text=text, variable=v).grid(row=i // 3, column=i % 3, sticky="w", padx=(0, px(16)))
+            self.view_vars[key] = v
+
         section(right, "Мотивация")
         tk.Label(right, text="Строка, ради чего всё это. Она висит на экране штурма.",
                  font=F["small"], bg=C.BG, fg=C.MUTED, anchor="w").pack(fill="x")
@@ -4482,6 +4563,9 @@ class SettingsView(tk.Frame):
             f"{c.get('name', '')}, {c.get('color', '#7A8494')}, {c.get('kind', 'neutral')}"
             for c in self.app.store.categories))
         self.theme_seg.set(s.get("theme", "system"), C.FOCUS)
+        hidden = set(s.get("hidden_views") or [])
+        for key, v in self.view_vars.items():
+            v.set(key not in hidden)
         self._launch_status()
 
     def save(self):
@@ -4518,7 +4602,12 @@ class SettingsView(tk.Frame):
                              "kind": kind})
         if cats:
             app.store.data["categories"] = cats
+        hidden = sorted(k for k, v in self.view_vars.items() if not v.get())
+        rebuild = hidden != sorted(s.get("hidden_views") or [])
+        s["hidden_views"] = hidden
         app.store.save()
+        if rebuild:
+            app.rebuild_sidebar()
         if not app.pomo.is_active():
             app.pomo.reset()
         app.apply_topmost()
@@ -4531,9 +4620,10 @@ class SettingsView(tk.Frame):
 
 class HelpDialog(tk.Toplevel):
     TEXT = """Везде
-  Ctrl+1 … Ctrl+9    разделы (Ctrl+1 — Ставка, Ctrl+2 — Штурм, Ctrl+0 — Таймер)
-  Ctrl+K             поиск по задачам и командам
+  Ctrl+1 … Ctrl+0    разделы (Ctrl+1 — Ставка, Ctrl+2 — Штурм, Ctrl+0 — Хронометраж)
+  Ctrl+K             поиск по задачам и командам — там же все новые разделы
   Ctrl+I             записать мысль во входящие (работает и из мини-окна)
+  Ctrl+U             перехват соблазна (ПВО)
   Ctrl+N             новый приказ (задача)
   Ctrl+M             мини-окно поверх остальных
   Ctrl+Z             отменить последнее действие с приказами
@@ -4542,13 +4632,15 @@ class HelpDialog(tk.Toplevel):
 
 Из любой программы (Windows)
   Ctrl+Alt+I         записать мысль
+  Ctrl+Alt+U         перехват соблазна
   Ctrl+Alt+P         штурм: старт или пауза
   Ctrl+Alt+T         показать окно Генштаба
 
 Порядок дня
-  Утро               построение: режим дня, норма, главный удар, первое направление
+  Утро               построение: утренний осмотр, протокол дня, режим, норма, главный удар
   Днём               штурмы по блокам; в 15:00 и 19:00 — тревога, если нормы меньше 40% и 70%
-  Вечер              вечерняя сводка: сон, подъём, тренировка, питание, итог, приказ на завтра
+  Соблазн            Ctrl+U: записал, выдержал {hold} минут, отметил итог
+  Вечер              сводка: сон, подъём, тренировка, питание, итог, вечерняя поверка, приказ на завтра
   Воскресенье        разбор недели: что планировали, что вышло, почему, что меняю
 
 Ставка (Ctrl+1)
@@ -4556,21 +4648,39 @@ class HelpDialog(tk.Toplevel):
   Фронты             линия кампании, линия фронта по направлениям, рубежи, тыл
   Разведка           прогноз Монте-Карло: возьмёшь ли цель, сценарии, где теряются часы
   Наряды             звание и штрафы, наряды вне очереди, резерв Ставки, перенос нормы
+  Личное дело        звание и выслуга, награды, рекорды, взыскания, послужной список кампаний
   Дневник            клетка — день: клик — сводка, правый клик — режим дня и резерв
   Дежурный           профиль, напоминания, блокировки, тревоги, связка с другими программами
-  Устав              задачи кампании, этапы, бюджет направлений, режимы дня, правила
+  Устав              задачи кампании, правила дисциплины, этапы, бюджет, режимы дня, новая кампания
 
-Твёрдость
-  Засчитан           боеготовность от 70; не засчитан — наряд: +1 ч к норме следующего дня
-  Нет сводки         наряд: письменный разбор от 200 знаков, срок два дня
-  Главный удар       не доведён — наряд довести за два дня
-  Штрафы             снимают опыт, звание может упасть; не больше трёх открытых нарядов
+Твёрдость (меняется: Устав → Изменить правила)
+  Засчитан           боеготовность от {good}; не засчитан — наряд: +{duty_hours} ч к норме следующего дня
+  Нет сводки         наряд: письменный разбор от {write_min} знаков
+  Главный удар       не доведён — наряд довести за {task_days} дн.
+  Штрафы             снимают опыт, звание может упасть; открытых нарядов не больше {duty_cap}
 
 Гибкость
-  Резерв Ставки      6 дней без нормы + 1 за каждые 7 засчитанных подряд; на сегодня — до 12:00
-  Оборона            3 часа при болезни или срыве; две за 7 дней бесплатно
-  Перенос нормы      до 3 ч недобора на два следующих дня: вечером или до 12:00 следующего
+  Резерв Ставки      {reserve} дней без нормы + 1 за каждые {earn} засчитанных подряд; на сегодня — до {deadline}
+  Оборона            режим с малой нормой при болезни или срыве; {defense} за 7 дней бесплатно
+  Перенос нормы      до {carry} ч недобора на {carry_days} следующих дня: вечером после {carry_from} или до {deadline}
   Марш               дни с парами и дорогой — меньшая норма без штрафа
+
+Новая кампания
+  Устав → Новая кампания: итоговый разбор, итоги — в послужной список, опыт — в выслугу.
+  Старт в будущем — новая кампания развернётся сама, когда кончится текущая.
+
+Дисциплина
+  ПВО                перехваты соблазнов: что тянет, сила 1–5, удержание, итог; откуда и когда атакует
+  Протоколы          «если — то»: решения, принятые заранее; показываются в перехвате и на построении
+  Боевые листы       чек-листы по дням: утренний осмотр, перед штурмом, вечерняя поверка, тыловой день
+
+Тыл
+  Физподготовка      нормативы с порогами «удовл. — хорошо — отлично», замеры, рекорды, график
+  Казна              траты одной строкой, лимит месяца, «можно в день», дни без трат, правило 48 часов
+
+Опыт
+  час 10 · сводка 10 · засчитанный день 20 · тренировка 15 · точка навыка 50 · оценка 20
+  перехват выдержан 5 (до 5 в день) · боевой лист закрыт 5 · день проверки по физо 20
 
 Штурм (Ctrl+2)
   Пробел             старт и пауза
@@ -4605,7 +4715,7 @@ class HelpDialog(tk.Toplevel):
 
 Рубежи (Ctrl+6)
   Формулы из силлабусов и сколько нужно на оставшемся
-  План подготовки    Ставка → Календарь или Фронты: задачи на Д-7, Д-5, Д-3, Д-2, Д-1
+  План подготовки    Ставка → Календарь или Фронты: задачи на {backplan}
 
 Арсенал (Ctrl+7)
   Конспекты, майндмэпы, карточки; все клавиши: «Файл» → «Горячие клавиши»
@@ -4621,13 +4731,17 @@ class HelpDialog(tk.Toplevel):
   +1 эконом IV       то же с результатом
   сон 7,5 · подъём 7:10 · трен сила · еда 4 · энергия 3 · день марш · день оборона
   итог: разобрал IV  итог дня
+  перехват ютуб 4    соблазн на перехвате; устоял · сорвался — итог последнего
+  трата 350 кафе     трата (в конце «!» — импульс); доход 5000
+  вес 73,5           замер веса; норматив подтягивания 14 — любой норматив
   Сокращения направлений — Ставка → Дежурный → Списки
 
 Только в Telegram
   старт тервер / стоп результат   штурм с телефона: время запишется само
   сводка сон 7 подъём 7:05 трен сила еда 4 энергия 4 итог: …   вечерняя сводка целиком
-  приказ · статус · разведка · звание · наряды · разбор: текст
+  приказ · статус · разведка · звание · наряды · разбор: текст · дело
   резерв · резерв завтра причина · перенос 2 причина · отчёт · неделя · отмена · /help
+  пво · листы · лист осмотр всё · протоколы · казна · физо
 
 Связка с другими программами
   status.json        в папке данных: идёт ли штурм, по чему и до скольки — для блокировщика
@@ -4637,7 +4751,20 @@ class HelpDialog(tk.Toplevel):
   Пакет для Claude   разбор недели или донесение → markdown с цифрами и вопросами в буфер
   Записать время     занести работу без таймера — только с результатом
   Сроки в календарь  выгрузка .ics для Google Календаря или телефона
+  Разделы в меню     Настройки → Разделы: лишнее можно спрятать
   Всё это — в поиске по Ctrl+K"""
+
+    @classmethod
+    def text_for(cls, app):
+        sysm = app.system
+        rl = sysm.rule
+        return cls.TEXT.format(
+            good=int(sysm.coach.get("good_score", 70) or 70), duty_hours=fmt_h(rl("duty_hours")),
+            write_min=rl("write_min"), task_days=rl("duty_task_days") + 1, duty_cap=rl("duty_cap"),
+            reserve=sysm.reserve_cfg().get("base"), earn=rl("reserve_earn_streak"), deadline=rl("reserve_deadline"),
+            defense=rl("defense_free"), carry=fmt_h(rl("carry_max_day")), carry_days=rl("carry_days"),
+            carry_from=rl("carry_from"), hold=sysm.urge_hold(),
+            backplan=", ".join(f"Д-{off}" for off, _t in backplan_steps(sysm.rules())))
 
     def __init__(self, app):
         super().__init__(app)
@@ -4646,18 +4773,30 @@ class HelpDialog(tk.Toplevel):
         if app.state() != "withdrawn":
             self.transient(app)
         F, px = app.fonts, app.px
-        lines = self.TEXT.splitlines()
-        text = tk.Text(self, font=F["mono"], bg=C.BG, fg=C.INK, relief="flat", highlightthickness=0,
-                       width=max(len(line) for line in lines) + 2, height=len(lines) + 1,
+        body_text = self.text_for(app)
+        lines = body_text.splitlines()
+        line_h = max(12, tkfont.Font(root=app, font=F["mono"]).metrics("linespace"))
+        rows = max(20, min(len(lines) + 1, int(self.winfo_screenheight() * 0.75) // line_h))
+        frame = tk.Frame(self, bg=C.BG)
+        frame.pack(fill="both", expand=True)
+        text = tk.Text(frame, font=F["mono"], bg=C.BG, fg=C.INK, relief="flat", highlightthickness=0,
+                       width=max(len(line) for line in lines) + 2, height=rows,
                        padx=px(22), pady=px(18), wrap="none")
-        text.insert("1.0", self.TEXT)
+        sb = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=sb.set)
+        text.insert("1.0", body_text)
+        for i, line in enumerate(lines, 1):
+            if line and not line.startswith(" "):
+                text.tag_add("h", f"{i}.0", f"{i}.end")
+        text.tag_configure("h", foreground=C.FOCUS, font=(F["mono"][0], F["mono"][1], "bold"))
         text.configure(state="disabled")
-        text.pack(fill="both", expand=True)
-        ttk.Button(self, text="Закрыть", command=self.destroy).pack(pady=(0, px(16)))
+        sb.pack(side="right", fill="y")
+        text.pack(side="left", fill="both", expand=True)
+        ttk.Button(self, text="Закрыть", command=self.destroy).pack(pady=(px(8), px(16)))
         self.bind("<Escape>", lambda e: self.destroy())
         self.update_idletasks()
         x = app.winfo_rootx() + max(0, (app.winfo_width() - self.winfo_reqwidth()) // 2)
-        y = app.winfo_rooty() + max(0, (app.winfo_height() - self.winfo_reqheight()) // 3)
+        y = max(0, app.winfo_rooty() + max(0, (app.winfo_height() - self.winfo_reqheight()) // 3))
         self.geometry(f"+{x}+{y}")
         self.focus_set()
 
@@ -6707,6 +6846,90 @@ BACKPLAN_STEPS = [(7, "разведка: материалы, прошлые ва
                   (2, "слабые темы: повторение и карточки"),
                   (1, "лёгкий день: шпаргалка, карточки, отбой до 23:00")]
 
+# Правила дисциплины. Всё, что раньше было зашито в код, меняется в «Ставка → Устав → Правила».
+RULE_DEFAULTS = {
+    "duties_on": True,            # наряды вне очереди выдаются
+    "duty_cap": DUTY_CAP,         # открытых нарядов не больше
+    "duty_hours": 1.0,            # сколько часов добавляет наряд за незасчитанный день
+    "duty_task_days": 1,          # сколько дней после вчерашнего на довести главный удар (1 — сегодня и завтра)
+    "write_min": WRITE_MIN,       # письменный разбор — от стольких знаков
+    "reserve_deadline": RESERVE_DEADLINE,
+    "reserve_earn_streak": RESERVE_EARN_STREAK,
+    "reserve_earn_cap": RESERVE_EARN_CAP,
+    "carry_on": True,
+    "carry_from": CARRY_FROM,
+    "carry_max_day": CARRY_MAX_DAY,
+    "carry_max_week": CARRY_MAX_WEEK,
+    "carry_max_debt": CARRY_MAX_DEBT,
+    "carry_days": 2,              # на сколько следующих дней с нормой делится перенос
+    "downgrade_until": DOWNGRADE_UNTIL,
+    "defense_free": DEFENSE_FREE,
+    "met_share": 97,              # день выполнен по часам: столько процентов нормы
+    "wake_slack": 30,             # подъём вовремя: опоздание не больше стольких минут
+    "wake_penalty": 60,           # штраф за подъём: опоздание больше стольких минут
+    "morning_required": True,     # без главного удара построение не принимается
+    "result_required": True,      # часы без таймера — только с результатом
+}
+RULE_LABELS = {
+    "duties_on": "Наряды вне очереди выдаются",
+    "duty_cap": "Открытых нарядов не больше",
+    "duty_hours": "Наряд за незасчитанный день, ч",
+    "duty_task_days": "Довести главный удар, дней",
+    "write_min": "Письменный разбор, знаков от",
+    "reserve_deadline": "Резерв на сегодня — до",
+    "reserve_earn_streak": "Резерв +1 за засчитанных подряд",
+    "reserve_earn_cap": "Заработать резерва не больше",
+    "carry_on": "Перенос нормы разрешён",
+    "carry_from": "Перенос сегодняшнего — после",
+    "carry_max_day": "Перенос за день, ч до",
+    "carry_max_week": "Переносов в неделю не больше",
+    "carry_max_debt": "Долг по переносам, ч до",
+    "carry_days": "Перенос делится на дней",
+    "downgrade_until": "Режим с меньшей нормой — до",
+    "defense_free": "Бесплатных оборон за 7 дней",
+    "met_share": "День выполнен по часам, % нормы",
+    "wake_slack": "Подъём вовремя: допуск, мин",
+    "wake_penalty": "Штраф за подъём после, мин",
+    "morning_required": "Без главного удара построение не принимается",
+    "result_required": "Часы без таймера — только с результатом",
+}
+RULE_LIMITS = {"duty_cap": (1, 10), "duty_hours": (0.25, 4), "duty_task_days": (1, 7), "write_min": (0, 2000),
+               "reserve_earn_streak": (2, 60), "reserve_earn_cap": (0, 30), "carry_max_day": (0.25, 8),
+               "carry_max_week": (0, 7), "carry_max_debt": (0.5, 24), "carry_days": (1, 5), "defense_free": (0, 7),
+               "met_share": (50, 100), "wake_slack": (0, 180), "wake_penalty": (10, 300)}
+
+
+def rule_value(rules, key):
+    """Значение правила из system.rules с проверкой типа и границ; мусор — значение по умолчанию."""
+    default = RULE_DEFAULTS[key]
+    v = (rules or {}).get(key, default)
+    try:
+        if isinstance(default, bool):
+            return bool(v)
+        if isinstance(default, str):
+            hm = parse_hm(v)
+            return f"{hm[0]:02d}:{hm[1]:02d}" if hm else default
+        v = float(v)
+        lo, hi = RULE_LIMITS.get(key, (None, None))
+        if lo is not None:
+            v = min(hi, max(lo, v))
+        return int(round(v)) if isinstance(default, int) else v
+    except (TypeError, ValueError):
+        return default
+
+
+def backplan_steps(rules):
+    """Шаги плана подготовки к рубежу: [(дней до рубежа, что делать)], по убыванию дней."""
+    out = []
+    for item in (rules or {}).get("backplan") or []:
+        try:
+            off, text = int(item[0]), str(item[1]).strip()
+        except (TypeError, ValueError, IndexError):
+            continue
+        if 1 <= off <= 60 and text:
+            out.append((off, text))
+    return sorted(out, reverse=True) or list(BACKPLAN_STEPS)
+
 # что было в Темпе 8.0 (система 96 дней) — нужно, чтобы при переезде отличить свои настройки от стандартных
 SYS_BLOCKS_V1 = {
     "Учебный": [("07:10", "08:15", "Тренировка", "train", ""),
@@ -6971,7 +7194,9 @@ COACH_DEFAULTS = {
     "autotrack": {"on": True, "min": 3, "notes_min": 2, "toast": True, "rules": []},
     "cards": {"on": True, "time": "19:00"},
     "weights": {"hours": 50, "checkin": 10, "train": 10, "sleep": 10, "food": 10, "touches": 10, "cards": 5,
-                "wake": 5, "mit": 10},
+                "wake": 5, "mit": 10, "lists": 0},
+    "urges": {"on": True, "hold": 10},
+    "lists": {"morning": True, "evening": True, "assault": False},
     "good_score": 70,
     "skip_phrase": "пропускаю честно",
     "motivation": [
@@ -7018,7 +7243,7 @@ JOURNAL_KINDS = {"snooze": "отложил", "skip": "пропустил", "afte
                  "phone": "с телефона", "minimize": "свернул окно", "auto": "автохронометраж",
                  "reserve": "резерв Ставки", "carry": "перенос нормы", "duty": "наряд", "retreat": "отступление",
                  "alarm": "тревога", "rank": "звание", "noresult": "штурм без результата", "defense": "оборона",
-                 "campaign": "кампания"}
+                 "campaign": "кампания", "urge": "ПВО", "fitness": "физподготовка"}
 
 
 # Короткие имена направлений для ввода с телефона: «+1,5 эконом», «старт мл».
@@ -7111,6 +7336,220 @@ def xp_level(xp):
     return level, 50 * (level - 1) ** 2, 50 * level ** 2
 
 
+# ───────────────────────── Генштаб 10.0: ПВО, протоколы, боевые листы, физподготовка, казна ─────────────────────────
+
+URGE_KINDS = ["YouTube и видео", "Лента и соцсети", "Телефон без дела", "Игры", "Сладкое и перекус",
+              "Покупка не по плану", "Лечь полежать", "Бросить штурм раньше", "Другое"]
+URGE_HOLD_MIN = 10
+URGE_RESULTS = {"held": "устоял", "fell": "сорвался"}
+
+# «Если — то»: заранее принятое решение срабатывает быстрее силы воли
+SYS_PROTOCOLS = [
+    ("Тянет в ленту или на YouTube во время штурма",
+     "Ctrl+I — записать мысль, Ctrl+U — перехват, и обратно в штурм. Отдых — только на привале.",
+     ["YouTube и видео", "Лента и соцсети", "Телефон без дела", "Игры"]),
+    ("Не хочется начинать",
+     "Пять минут: открыть материал и сделать первый шаг. Как себя чувствую — решаю после первого штурма.",
+     ["Лечь полежать"]),
+    ("Хочется бросить штурм раньше",
+     "Доделать до конца таймера, записать, где застрял, и уйти на привал. Бросать — только с докладом.",
+     ["Бросить штурм раньше"]),
+    ("К 15:00 меньше половины нормы",
+     "План спасения: два штурма подряд по главному удару, остальное — перенос вечером, а не ночь.", []),
+    ("Накрыла усталость после обеда", "20 минут прогулки или 15 минут сна. Не телефон.", ["Лечь полежать"]),
+    ("Отбой, а норма не закрыта", "Сон важнее: перенос нормы в сводке, а не работа до двух ночи.", []),
+    ("Пропустил тренировку утром", "Короткая тренировка 20 минут вечером, а не перенос на завтра.", []),
+    ("Тянет на сладкое или перекус", "Стакан воды и белковый перекус по плану. Сладкое — только после ужина.",
+     ["Сладкое и перекус"]),
+    ("Хочется купить не по плану", "В «Казну», в список желаний: решение — через 48 часов.",
+     ["Покупка не по плану"]),
+    ("Сорвался", "Честно отметить в ПВО и вернуться к плану. Не пропускать дважды.", []),
+]
+
+CHECK_WHEN = {"morning": "утро", "assault": "перед штурмом", "evening": "вечер", "any": "в течение дня"}
+SYS_CHECKLISTS = [
+    ("Утренний осмотр", "morning", list(range(7)),
+     ["Подъём по будильнику, без телефона в кровати", "Стакан воды", "Кровать заправлена",
+      "Тренировка или зарядка по плану", "Завтрак с белком", "Построение в Генштабе"]),
+    ("Перед штурмом", "assault", list(range(7)),
+     ["Телефон в другой комнате", "Вода на столе", "Цель штурма записана одной строкой",
+      "Лишние вкладки закрыты", "Материалы открыты"]),
+    ("Вечерняя поверка", "evening", list(range(7)),
+     ["Вечерняя сводка подана", "Приказ на завтра и главный удар", "Карточки повторены",
+      "Рабочее место убрано", "Вещи и еда на завтра", "Экраны выключены за 30 минут до отбоя"]),
+    ("Тыловой день", "any", [6],
+     ["Закупка на неделю", "Готовка на 3–4 дня", "Стирка и порядок", "Разбор недели", "План следующей недели"]),
+]
+
+FIT_KINDS = {"count": "раз", "sec": "секунды", "time": "мин:сек", "number": "число"}
+FIT_BETTER = {"more": "больше — лучше", "less": "меньше — лучше", "none": "без оценки"}
+FIT_GRADES = ("неуд.", "удовл.", "хорошо", "отлично")
+# название, вид значения, единица, что лучше, пороги (удовл., хорошо, отлично)
+SYS_NORMS = [
+    ("Подтягивания", "count", "раз", "more", (10, 12, 15)),
+    ("Отжимания от пола", "count", "раз", "more", (30, 40, 50)),
+    ("Брусья", "count", "раз", "more", (10, 15, 20)),
+    ("Пресс за 1 минуту", "count", "раз", "more", (35, 45, 50)),
+    ("Планка", "sec", "сек", "more", (90, 120, 180)),
+    ("Бег 1 км", "time", "мин:сек", "less", (230, 215, 200)),
+    ("Бег 3 км", "time", "мин:сек", "less", (870, 810, 765)),
+    ("Вес", "number", "кг", "none", None),
+]
+
+MONEY_CATS = ["Продукты", "Кафе и доставка", "Транспорт", "Связь и подписки", "Учёба и книги", "Спорт и здоровье",
+              "Одежда", "Развлечения", "Подарки", "Прочее"]
+MONEY_IN_CAT = "Доход"
+WISH_STATUS = {"wait": "ждёт решения", "bought": "куплено", "dropped": "отказался"}
+
+
+URGE_ALIASES = {
+    "ютуб": "YouTube и видео", "youtube": "YouTube и видео", "видео": "YouTube и видео", "сериал": "YouTube и видео",
+    "кино": "YouTube и видео", "лента": "Лента и соцсети", "соцсети": "Лента и соцсети", "инста": "Лента и соцсети",
+    "тикток": "Лента и соцсети", "вк": "Лента и соцсети", "reddit": "Лента и соцсети", "телеграм": "Лента и соцсети",
+    "телефон": "Телефон без дела", "игры": "Игры", "игра": "Игры", "дота": "Игры", "сладкое": "Сладкое и перекус",
+    "перекус": "Сладкое и перекус", "еда": "Сладкое и перекус", "шоколад": "Сладкое и перекус",
+    "покупка": "Покупка не по плану", "купить": "Покупка не по плану", "маркетплейс": "Покупка не по плану",
+    "лечь": "Лечь полежать", "полежать": "Лечь полежать", "диван": "Лечь полежать", "поспать": "Лечь полежать",
+    "бросить": "Бросить штурм раньше", "сдаться": "Бросить штурм раньше",
+}
+
+
+def lc_first(text):
+    return text[:1].lower() + text[1:] if text else text
+
+
+def parse_urge(text, kinds):
+    """«ютуб 4 после обеда» → («YouTube и видео», 4, «после обеда»). Сила — цифра 1–5, по умолчанию 3."""
+    words = (text or "").split()
+    power = 3
+    rest = []
+    for w in words:
+        if re.fullmatch(r"[1-5]", w) and power == 3 and not any(x.isdigit() for x in rest):
+            power = int(w)
+        else:
+            rest.append(w)
+    what = None
+    for k in range(min(4, len(rest)), 0, -1):
+        q = " ".join(rest[:k]).lower()
+        hit = URGE_ALIASES.get(q) or next((x for x in kinds if x.lower() == q), None) or \
+            next((x for x in kinds if x.lower().startswith(q)), None) or \
+            next((v for a, v in URGE_ALIASES.items() if a.startswith(q) and len(q) >= 3), None)
+        if hit:
+            what, rest = hit, rest[k:]
+            break
+    if what is None:
+        what = " ".join(rest[:3]).capitalize() if rest else "Другое"
+        rest = rest[3:]
+    return what, power, " ".join(rest)
+
+
+def default_protocols():
+    return [{"id": _sid(), "if": a, "then": b, "urges": list(u), "on": True} for a, b, u in SYS_PROTOCOLS]
+
+
+def default_checklists():
+    return [{"id": _sid(), "title": t, "when": w, "days": list(d), "items": list(items), "on": True}
+            for t, w, d, items in SYS_CHECKLISTS]
+
+
+def fitness_defaults():
+    norms = []
+    for name, kind, unit, better, grades in SYS_NORMS:
+        norms.append({"id": _sid(), "name": name, "kind": kind, "unit": unit, "better": better,
+                      "grades": list(grades) if grades else [], "target": None, "on": True})
+    return {"norms": norms, "tests": [], "every": 30}
+
+
+def money_defaults():
+    return {"on": True, "currency": "₽", "month_limit": 0, "cats": [{"name": c, "limit": 0} for c in MONEY_CATS],
+            "entries": [], "wishes": [], "cooldown": 48}
+
+
+def parse_fit_value(kind, text):
+    """«3:45» → 225 (секунды) для бега, «12» → 12, «72,5» → 72.5. Ошибка — ValueError."""
+    t = str(text or "").strip().lower().replace(",", ".").replace(" ", "")
+    if not t:
+        raise ValueError("пусто")
+    if kind == "time":
+        m = re.fullmatch(r"(\d+):(\d{1,2})(?:[.](\d))?", t)
+        if m:
+            if int(m[2]) > 59:
+                raise ValueError("секунд больше 59")
+            return int(m[1]) * 60 + int(m[2]) + (int(m[3]) / 10 if m[3] else 0)
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)(?:м|мин|min)?", t)
+        if m:
+            return float(m[1]) * 60
+        raise ValueError("время в виде 3:45")
+    if kind == "sec":
+        m = re.fullmatch(r"(\d+):(\d{2})", t)
+        if m:
+            return int(m[1]) * 60 + int(m[2])
+        t = re.sub(r"(?:с|сек|s)$", "", t)
+    v = float(t)
+    if v < 0:
+        raise ValueError("отрицательное")
+    return int(round(v)) if kind == "count" else v
+
+
+def fmt_fit_value(kind, value):
+    if value is None:
+        return "—"
+    v = float(value)
+    if kind == "time":
+        sec = int(round(v))
+        return f"{sec // 60}:{sec % 60:02d}"
+    if kind == "sec":
+        sec = int(round(v))
+        return f"{sec // 60}:{sec % 60:02d}" if sec >= 120 else f"{sec} с"
+    if kind == "count":
+        return str(int(round(v)))
+    return fmt_plain(round(v, 2))
+
+
+def fit_grade(norm, value):
+    """0 — неуд., 1 — удовл., 2 — хорошо, 3 — отлично; None — норматив без оценки или нет значения."""
+    grades = norm.get("grades") or []
+    better = norm.get("better", "more")
+    if value is None or better == "none" or len(grades) != 3:
+        return None
+    try:
+        g = [float(x) for x in grades]
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    level = 0
+    for i, thr in enumerate(g, 1):
+        if (v >= thr - 1e-9) if better == "more" else (v <= thr + 1e-9):
+            level = i
+    return level
+
+
+def parse_money(text):
+    """«1 250,50» → 1250.5, «1.5к» → 1500. Ошибка — ValueError."""
+    t = str(text or "").strip().lower().replace(" ", "").replace(" ", "").replace("₽", "").replace("р", "")
+    mult = 1
+    if t.endswith(("к", "k")):
+        mult, t = 1000, t[:-1]
+    v = float(t.replace(",", "."))
+    if v <= 0:
+        raise ValueError("сумма должна быть больше нуля")
+    return round(v * mult, 2)
+
+
+def fmt_money(value, cur="₽"):
+    v = round(float(value or 0), 2)
+    whole = f"{abs(int(v)):,}".replace(",", " ")
+    frac = abs(v) - abs(int(v))
+    text = whole + (f",{int(round(frac * 100)):02d}" if frac >= 0.005 else "")
+    return ("−" if v < 0 else "") + text + (f" {cur}" if cur else "")
+
+
+def month_bounds(d):
+    a = d.replace(day=1)
+    b = (a + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    return a, b
+
+
 def sys_defaults():
     net = net_defaults()
     net["quota"] = False
@@ -7158,6 +7597,20 @@ def sys_defaults():
         "upkeep": "",
         "rank_seen": -1,
         "alarms": {},
+        # Генштаб 10.0
+        "name": CAMPAIGN,
+        "rules": {},
+        "rules_text": "",
+        "xp_carry": 0,
+        "campaigns": [],
+        "final_review": {},
+        "urges": [],
+        "protocols": default_protocols(),
+        "checklists": default_checklists(),
+        "check_runs": {},
+        "fitness": fitness_defaults(),
+        "money": money_defaults(),
+        "next_campaign": {},
     }
 
 
@@ -7230,8 +7683,100 @@ def normalize_system(raw):
         res_base = RESERVE_BASE
     out["reserve"] = {"base": res_base, "used": res.get("used") if isinstance(res.get("used"), dict) else {}}
     out["duties"] = [x for x in out["duties"] if isinstance(x, dict) and x.get("id")][-300:]
+    normalize_kit(out, base)
     out["version"] = SYS_VERSION
     return out
+
+
+def normalize_kit(out, base):
+    """Генштаб 10.0: правила, послужной список, ПВО, протоколы, листы, физподготовка, казна — без мусора."""
+    out["rules"] = {k: v for k, v in out["rules"].items() if k in RULE_DEFAULTS or k == "backplan"}
+    if not isinstance(out.get("rules_text"), str):
+        out["rules_text"] = ""
+    if not isinstance(out.get("name"), str) or not out["name"].strip():
+        out["name"] = CAMPAIGN
+    try:
+        out["xp_carry"] = max(0, int(out.get("xp_carry") or 0))
+    except (TypeError, ValueError):
+        out["xp_carry"] = 0
+    out["campaigns"] = [c for c in out["campaigns"] if isinstance(c, dict)]
+    nxt = out.get("next_campaign") if isinstance(out.get("next_campaign"), dict) else {}
+    out["next_campaign"] = nxt if sys_date(nxt.get("start")) and sys_date(nxt.get("end")) else {}
+    out["urges"] = [u for u in out["urges"] if isinstance(u, dict) and u.get("ts")][-2000:]
+    for u in out["urges"]:
+        u.setdefault("id", _sid())
+    out["protocols"] = [p for p in out["protocols"] if isinstance(p, dict) and (p.get("if") or p.get("then"))]
+    for p in out["protocols"]:
+        p.setdefault("id", _sid())
+        p.setdefault("on", True)
+        if not isinstance(p.get("urges"), list):
+            p["urges"] = []
+    lists = []
+    for c in out["checklists"]:
+        if not isinstance(c, dict) or not c.get("title"):
+            continue
+        c.setdefault("id", _sid())
+        c.setdefault("on", True)
+        if c.get("when") not in CHECK_WHEN:
+            c["when"] = "any"
+        c["items"] = [str(x) for x in (c.get("items") or []) if str(x).strip()]
+        days = [d for d in (c.get("days") or []) if isinstance(d, int) and 0 <= d <= 6]
+        c["days"] = sorted(set(days)) if days else list(range(7))
+        lists.append(c)
+    out["checklists"] = lists
+    runs = out.get("check_runs") if isinstance(out.get("check_runs"), dict) else {}
+    out["check_runs"] = {k: v for k, v in runs.items() if sys_date(k) and isinstance(v, dict)}
+    fit = dict(base["fitness"])
+    fit.update(out["fitness"] if isinstance(out.get("fitness"), dict) else {})
+    fit["norms"] = [n for n in fit.get("norms") or [] if isinstance(n, dict) and n.get("name")]
+    for n in fit["norms"]:
+        n.setdefault("id", _sid())
+        n.setdefault("on", True)
+        if n.get("kind") not in FIT_KINDS:
+            n["kind"] = "number"
+        if n.get("better") not in FIT_BETTER:
+            n["better"] = "more"
+        if not isinstance(n.get("grades"), list) or len(n["grades"]) != 3:
+            n["grades"] = []
+    ids = {n["id"] for n in fit["norms"]}
+    fit["tests"] = [t for t in fit.get("tests") or [] if isinstance(t, dict) and t.get("norm") in ids
+                    and sys_date(t.get("date")) and isinstance(t.get("value"), (int, float))]
+    for t in fit["tests"]:
+        t.setdefault("id", _sid())
+    try:
+        fit["every"] = max(0, int(fit.get("every") or 0))
+    except (TypeError, ValueError):
+        fit["every"] = 30
+    out["fitness"] = fit
+    money = dict(base["money"])
+    money.update(out["money"] if isinstance(out.get("money"), dict) else {})
+    cats = []
+    for c in money.get("cats") or []:
+        if isinstance(c, dict) and str(c.get("name") or "").strip():
+            try:
+                lim = max(0.0, float(c.get("limit") or 0))
+            except (TypeError, ValueError):
+                lim = 0.0
+            cats.append({"name": str(c["name"]).strip(), "limit": lim})
+    money["cats"] = cats or [{"name": c, "limit": 0} for c in MONEY_CATS]
+    money["entries"] = [e for e in money.get("entries") or [] if isinstance(e, dict) and sys_date(e.get("date"))
+                        and isinstance(e.get("sum"), (int, float))]
+    for e in money["entries"]:
+        e.setdefault("id", _sid())
+        if e.get("kind") not in ("out", "in"):
+            e["kind"] = "out"
+    money["wishes"] = [w for w in money.get("wishes") or [] if isinstance(w, dict) and w.get("title")]
+    for w in money["wishes"]:
+        w.setdefault("id", _sid())
+        if w.get("status") not in WISH_STATUS:
+            w["status"] = "wait"
+    for key, default in (("month_limit", 0.0), ("cooldown", 48)):
+        try:
+            money[key] = max(0.0, float(money.get(key) or 0)) if key == "month_limit" else \
+                max(0, int(money.get(key) if money.get(key) is not None else default))
+        except (TypeError, ValueError):
+            money[key] = default
+    out["money"] = money
 
 
 SYS_SEED_TASKS = [
@@ -7555,6 +8100,23 @@ class CampaignMixin:
         return (self._gen, today, len(self.app.store.sessions), len(self.s["days"]), len(self.duties()),
                 len(self.reserve_cfg()["used"]))
 
+    # --- правила дисциплины и название кампании ---
+    def rules(self):
+        r = self.s.get("rules")
+        if not isinstance(r, dict):
+            r = self.s["rules"] = {}
+        return r
+
+    def rule(self, key):
+        return rule_value(self.rules(), key)
+
+    def name(self):
+        return (self.s.get("name") or "").strip() or CAMPAIGN
+
+    def rules_text(self):
+        text = self.s.get("rules_text")
+        return text if isinstance(text, str) and text.strip() else SYS_RULES
+
     # --- резерв Ставки ---
     def reserve_cfg(self):
         r = self.s.get("reserve")
@@ -7582,11 +8144,11 @@ class CampaignMixin:
                 continue
             if self.good_day(d):
                 run += 1
-                if run % RESERVE_EARN_STREAK == 0:
+                if run % self.rule("reserve_earn_streak") == 0:
                     earned += 1
             else:
                 run = 0
-        return min(earned, RESERVE_EARN_CAP)
+        return min(earned, self.rule("reserve_earn_cap"))
 
     def reserve_total(self, today):
         try:
@@ -7608,8 +8170,8 @@ class CampaignMixin:
             return False, "этот день уже в резерве"
         if d < today:
             return False, "задним числом резерв не объявляется"
-        if d == today and now >= at_time(d, RESERVE_DEADLINE):
-            return False, f"на сегодня резерв объявляется до {RESERVE_DEADLINE}"
+        if d == today and now >= at_time(d, self.rule("reserve_deadline")):
+            return False, f"на сегодня резерв объявляется до {self.rule('reserve_deadline')}"
         if self.reserve_left(today) <= 0:
             return False, "резерв исчерпан"
         return True, ""
@@ -7692,14 +8254,16 @@ class CampaignMixin:
         """Сколько недобора дня d можно перенести на два следующих дня: (часов, почему нельзя)."""
         now = now or PLATFORM["now"]()
         today = self.app.today()
+        if not self.rule("carry_on"):
+            return 0.0, "перенос нормы выключен в правилах"
         if not self.active(d) or self.is_reserve(d):
             return 0.0, "день без нормы"
         if d == today:
-            if now < at_time(d, CARRY_FROM):
-                return 0.0, f"перенос объявляется вечером, после {CARRY_FROM}"
+            if now < at_time(d, self.rule("carry_from")):
+                return 0.0, f"перенос объявляется вечером, после {self.rule('carry_from')}"
         elif d == today - timedelta(days=1):
-            if now >= at_time(today, RESERVE_DEADLINE):
-                return 0.0, f"вчерашний недобор переносится до {RESERVE_DEADLINE}"
+            if now >= at_time(today, self.rule("reserve_deadline")):
+                return 0.0, f"вчерашний недобор переносится до {self.rule('reserve_deadline')}"
         else:
             return 0.0, "переносится только сегодняшний или вчерашний недобор"
         if self.moved_hours(d) > 0:
@@ -7707,20 +8271,20 @@ class CampaignMixin:
         monday = week_monday(d)
         n = sum(1 for x in self.dates(max(monday, self.start()), min(monday + timedelta(days=6), self.end()))
                 if self.moved_hours(x) > 0)
-        if n >= CARRY_MAX_WEEK:
-            return 0.0, f"на этой неделе уже {n} переноса — больше нельзя"
-        room = CARRY_MAX_DEBT - self.carry_debt(today)
+        if n >= self.rule("carry_max_week"):
+            return 0.0, f"на этой неделе уже {n} {plural(n, ('перенос', 'переноса', 'переносов'))} — больше нельзя"
+        room = self.rule("carry_max_debt") - self.carry_debt(today)
         if room < 0.25:
-            return 0.0, f"долг по переносам уже {fmt_h(CARRY_MAX_DEBT - room)} ч"
+            return 0.0, f"долг по переносам уже {fmt_h(self.rule('carry_max_debt') - room)} ч"
         gap = self.day_plan(d) - self.hours_on(d)
         if gap < 0.25:
             return 0.0, "недобора нет"
-        if len(self.duty_days(d, 2)) < 1:
+        if len(self.duty_days(d, self.rule("carry_days"))) < 1:
             return 0.0, "переносить некуда: кампания кончается"
-        return math.floor(min(gap, CARRY_MAX_DAY, room) * 4) / 4, ""
+        return math.floor(min(gap, self.rule("carry_max_day"), room) * 4) / 4, ""
 
     def carry(self, d, hours, reason):
-        targets = self.duty_days(d, 2)
+        targets = self.duty_days(d, self.rule("carry_days"))
         if not targets or hours <= 0:
             return []
         hours = float(hours)
@@ -7751,8 +8315,9 @@ class CampaignMixin:
         return [x for x in self.duties() if x.get("status") == "open"]
 
     def duty_add(self, kind, title, reason, due, **extra):
-        if len(self.duties_open()) >= DUTY_CAP:
-            self.journal_add("duty", f"перегруз: наряд «{title}» не выдан — открыто уже {DUTY_CAP}")
+        cap_n = self.rule("duty_cap")
+        if len(self.duties_open()) >= cap_n:
+            self.journal_add("duty", f"перегруз: наряд «{title}» не выдан — открыто уже {cap_n}")
             return None
         duty = {"id": _sid(), "kind": kind, "title": title, "reason": reason,
                 "created": self.app.today().isoformat(), "due": due.isoformat(), "status": "open", "closed": None}
@@ -7812,6 +8377,8 @@ class CampaignMixin:
         y = today - timedelta(days=1)
         if not self.active(y) or self.is_reserve(y) or self.base_plan(y) <= 0:
             return True
+        if not self.rule("duties_on"):
+            return True
         rec = self.day(y)
         if not rec.get("done"):
             self.duty_add("write", f"Письменный разбор {y:%d.%m}",
@@ -7820,13 +8387,16 @@ class CampaignMixin:
         elif self.day_plan(y) > 0 and not self.good_day(y):
             score = self.day_score(y)[0]
             nxt = self.duty_days(y, 1)
+            extra = self.rule("duty_hours")
             if nxt and nxt[0] >= today:
-                self.duty_add("hours", f"+1 ч к норме {nxt[0]:%d.%m}", f"{y:%d.%m} не засчитан: боеготовность {score}",
-                              nxt[0], target=nxt[0].isoformat(), hours=1.0)
+                self.duty_add("hours", f"+{fmt_h(extra)} ч к норме {nxt[0]:%d.%m}",
+                              f"{y:%d.%m} не засчитан: боеготовность {score}",
+                              nxt[0], target=nxt[0].isoformat(), hours=extra)
         mit = self.app.task_by_id(rec.get("mit_id"))
         if mit is not None and mit.get("status") != "done":
             self.duty_add("task", f"Довести главный удар: {one_line(mit['title'], 60)}",
-                          f"главный удар {y:%d.%m} не доведён", today + timedelta(days=1), task_id=mit["id"])
+                          f"главный удар {y:%d.%m} не доведён", today + timedelta(days=self.rule("duty_task_days")),
+                          task_id=mit["id"])
         return True
 
     # --- штрафы и звания ---
@@ -7868,9 +8438,10 @@ class CampaignMixin:
                 if prev_fail:
                     out.append((d, p["fail2"], PENALTY_NAMES["fail2"]))
             wake = parse_hm(rec.get("wake"))
-            if wake and wake_goal and (wake[0] * 60 + wake[1]) - (wake_goal[0] * 60 + wake_goal[1]) > 60:
+            if wake and wake_goal and (wake[0] * 60 + wake[1]) - (wake_goal[0] * 60 + wake_goal[1]) > \
+                    self.rule("wake_penalty"):
                 out.append((d, p["wake"], f"подъём в {rec['wake']}"))
-            if self.day_type(d) == DEFENSE_TYPE and self.defense_count(d) > DEFENSE_FREE:
+            if self.day_type(d) == DEFENSE_TYPE and self.defense_count(d) > self.rule("defense_free"):
                 out.append((d, p["defense"], PENALTY_NAMES["defense"]))
             prev_fail = fail
         for duty in self.duties():
@@ -7882,8 +8453,14 @@ class CampaignMixin:
     def xp_cached(self, today):
         return self._cached("xp", self._ckey(today), lambda: self.xp(today))
 
+    def xp_carry(self):
+        try:
+            return max(0, int(self.s.get("xp_carry") or 0))
+        except (TypeError, ValueError):
+            return 0
+
     def xp_net(self, today):
-        return max(0, self.xp_cached(today) - sum(pts for _d, pts, _t in self.penalties(today)))
+        return max(0, self.xp_cached(today) + self.xp_carry() - sum(pts for _d, pts, _t in self.penalties(today)))
 
     def rank(self, today):
         xp = self.xp_net(today)
@@ -7891,7 +8468,8 @@ class CampaignMixin:
         idx, name = rank_of(level)
         nxt = RANKS[idx + 1] if idx + 1 < len(RANKS) else None
         return {"xp": xp, "level": level, "lo": lo, "hi": hi, "idx": idx, "name": name, "next": nxt,
-                "gross": self.xp_cached(today)}
+                "gross": self.xp_cached(today), "carry": self.xp_carry(),
+                "pen": sum(pts for _d, pts, _t in self.penalties(today))}
 
     # --- рубежи и обратное планирование ---
     def rubezhi(self, today, horizon=60):
@@ -7927,10 +8505,11 @@ class CampaignMixin:
             store.projects.append(proj)
         short = one_line(re.sub(r"\s*\(\d+(?:[.,]\d+)?%\)$", "", row["title"]), 46)
         made = []
-        for off, text in BACKPLAN_STEPS:
+        steps = backplan_steps(self.rules())
+        for off, text in steps:
             day = d - timedelta(days=off)
             if day < today:
-                if off != BACKPLAN_STEPS[0][0]:
+                if off != steps[0][0]:
                     continue
                 day = today  # разведку не пропускаем: если до рубежа меньше недели — сегодня
             task = new_task(title=f"Рубеж {d:%d.%m} · {short} — {text}", project=proj,
@@ -8162,7 +8741,8 @@ class CampaignMixin:
     def rank_text(self, today):
         r = self.rank(today)
         week = [x for x in self.penalties(today) if x[0] >= today - timedelta(days=7)]
-        lines = [f"Звание: {r['name']} · опыт {r['xp']} (без штрафов {r['gross']})"]
+        lines = [f"Звание: {r['name']} · опыт {r['xp']} (за кампанию {r['gross']}"
+                 + (f", выслуга {r['carry']}" if r["carry"] else "") + f", штрафы −{r['pen']})"]
         if r["next"]:
             lines.append(f"До звания «{r['next']}»: {r['hi'] - r['xp']} очков")
         if week:
@@ -8174,12 +8754,12 @@ class CampaignMixin:
 
     def duties_text(self, today):
         open_ = self.duties_open()
-        lines = [f"Нарядов открыто: {len(open_)} из {DUTY_CAP}."]
+        lines = [f"Нарядов открыто: {len(open_)} из {self.rule('duty_cap')}."]
         for d in open_:
             due = sys_date(d.get("due"))
             lines.append(f"• {d.get('title')} — {d.get('reason')}" + (f" (до {due:%d.%m})" if due else ""))
         if any(d.get("kind") == "write" for d in open_):
-            lines.append(f"Письменный разбор: «разбор: текст» от {WRITE_MIN} знаков.")
+            lines.append(f"Письменный разбор: «разбор: текст» от {self.rule('write_min')} знаков.")
         lines.append(f"Резерв: осталось {self.reserve_left(today)}. Долг по переносам: {fmt_h(self.carry_debt(today))} ч.")
         return "\n".join(lines)
 
@@ -8196,15 +8776,578 @@ class CampaignMixin:
         if new == LEAVE_TYPE and not self.is_reserve(d):
             return False, "увольнение — только за резерв Ставки"
         if self.type_hours(new) < self.type_hours(cur) - 1e-9:
-            if d < today or (d == today and now >= at_time(d, DOWNGRADE_UNTIL)):
-                return False, (f"режим с меньшей нормой объявляется заранее или до {DOWNGRADE_UNTIL}; "
+            if d < today or (d == today and now >= at_time(d, self.rule("downgrade_until"))):
+                return False, (f"режим с меньшей нормой объявляется заранее или до {self.rule('downgrade_until')}; "
                                "вечером — перенос нормы")
             if self.moved_hours(d) > 0:
                 return False, "с этого дня уже перенесена норма"
         return True, ""
 
 
-class System(CampaignMixin):
+class KitMixin:
+    """Генштаб 10.0: ПВО (перехват соблазнов), протоколы «если — то», боевые листы, физподготовка, казна,
+    послужной список и смена кампании."""
+
+    # --- ПВО: перехват соблазнов ---
+    def urges(self):
+        return self.s["urges"]
+
+    def urge_day(self, u):
+        return sys_date(u.get("day")) or sys_date(u.get("ts"))
+
+    def urge_kinds(self):
+        out = []
+        for k in list(URGE_KINDS) + [u.get("what") for u in reversed(self.urges())]:
+            if k and k not in out:
+                out.append(k)
+        return out
+
+    def urge_hold(self):
+        try:
+            return max(1, min(60, int((self.coach.get("urges") or {}).get("hold") or URGE_HOLD_MIN)))
+        except (TypeError, ValueError):
+            return URGE_HOLD_MIN
+
+    def urge_add(self, what, power=3, result=None, note="", when=None, hold=True, source=None):
+        now = when or PLATFORM["now"]()
+        try:
+            power = max(1, min(5, int(power)))
+        except (TypeError, ValueError):
+            power = 3
+        u = {"id": _sid(), "ts": now.isoformat(timespec="seconds"),
+             "day": day_of(now, self.app.store.settings["day_start_hour"]).isoformat(),
+             "what": (what or "Другое").strip()[:80], "power": power, "result": result, "note": (note or "")[:300],
+             "focus": bool(getattr(self.app, "coach", None) and self.app.coach.focused())}
+        if source:
+            u["src"] = source
+        if result is None and hold:
+            u["until"] = (now + timedelta(minutes=self.urge_hold())).isoformat(timespec="seconds")
+        elif result is not None:
+            u["closed"] = u["ts"]
+        self.urges().append(u)
+        del self.urges()[:-2000]
+        if result == "fell":
+            self.journal_add("urge", f"сорвался: {u['what']}")
+        self.invalidate()
+        return u
+
+    def urge_resolve(self, u, result, note=""):
+        u["result"] = result
+        u.pop("until", None)
+        u["closed"] = PLATFORM["now"]().isoformat(timespec="seconds")
+        if note:
+            u["note"] = note[:300]
+        if result == "fell":
+            self.journal_add("urge", f"сорвался: {u.get('what', '')}")
+        self.invalidate()
+
+    def urge_open(self):
+        return [u for u in self.urges() if u.get("result") is None]
+
+    def urge_due(self, now=None):
+        """Перехваты, у которых удержание кончилось, а итога ещё нет."""
+        now = now or PLATFORM["now"]()
+        out = []
+        for u in self.urge_open():
+            try:
+                if u.get("until") and datetime.fromisoformat(u["until"]) <= now:
+                    out.append(u)
+            except (TypeError, ValueError):
+                u.pop("until", None)
+        return out
+
+    def urge_stats(self, a, b):
+        items = [u for u in self.urges() if (d := self.urge_day(u)) and a <= d <= b]
+        held = sum(1 for u in items if u.get("result") == "held")
+        fell = sum(1 for u in items if u.get("result") == "fell")
+        kinds = defaultdict(lambda: [0, 0, 0])
+        hours = [0] * 24
+        for u in items:
+            k = kinds[u.get("what") or "Другое"]
+            k[0] += 1
+            if u.get("result") == "held":
+                k[1] += 1
+            elif u.get("result") == "fell":
+                k[2] += 1
+            try:
+                hours[datetime.fromisoformat(u["ts"]).hour] += 1
+            except (KeyError, TypeError, ValueError):
+                pass
+        powers = [int(u.get("power") or 0) for u in items if u.get("power")]
+        return {"n": len(items), "held": held, "fell": fell, "open": len(items) - held - fell,
+                "rate": held / (held + fell) if held + fell else None,
+                "kinds": sorted(kinds.items(), key=lambda kv: (-kv[1][0], kv[0])), "hours": hours,
+                "power": sum(powers) / len(powers) if powers else None,
+                "focus": sum(1 for u in items if u.get("focus"))}
+
+    def urge_clean_days(self, today):
+        """Дней подряд без срыва, считая сегодняшний (с первого перехвата)."""
+        days = [self.urge_day(u) for u in self.urges()]
+        days = [d for d in days if d]
+        if not days:
+            return 0
+        fell = {self.urge_day(u) for u in self.urges() if u.get("result") == "fell"}
+        first, d, n = min(days), today, 0
+        while d >= first and d not in fell:
+            n += 1
+            d -= timedelta(days=1)
+        return n
+
+    def kit_report_lines(self, a, b):
+        """Строки донесения про ПВО, листы, казну и физо за период — только если там что-то было."""
+        out = []
+        st = self.urge_stats(a, b)
+        if st["n"]:
+            out.append(f"ПВО: перехватов {st['n']}, устоял {st['held']}, сорвался {st['fell']}"
+                       + (f" — удержание {int(round(st['rate'] * 100))}%" if st["rate"] is not None else ""))
+        closed = total = 0
+        for d in self.dates(a, b):
+            dl, nl, _m, _i = self.checks_day(d)
+            closed += dl
+            total += nl
+        if closed:
+            out.append(f"Боевые листы: закрыто {closed} из {total}")
+        spent = self.money_spent(a, b)
+        if spent:
+            imp = [e for e in self.money_entries(a, b) if e.get("impulse")]
+            out.append(f"Казна: траты {fmt_money(spent, self.money_cur())}"
+                       + (f", импульсных {len(imp)}" if imp else "")
+                       + (f", дней без трат {self.nospend_days(a, b)}" if b > a else ""))
+        tests = [t for t in self.fit()["tests"] if a.isoformat() <= t["date"] <= b.isoformat()]
+        if tests:
+            parts = []
+            for t in tests[-5:]:
+                n = self.norm(t["norm"])
+                if n:
+                    parts.append(f"{n['name']} {fmt_fit_value(n['kind'], t['value'])}")
+            out.append("Физо: " + ", ".join(parts))
+        return out
+
+    def kit_alerts(self, today):
+        """Сигналы 10.0 для «Сводки»: перехваты без итога, перерасход, нормативы, желания на решение."""
+        app = self.app
+        out = []
+        stale = [u for u in self.urge_due() if u.get("asked")]
+        if stale:
+            out.append(("warn", f"Перехваты без итога: {len(stale)} — " + ", ".join(u.get("what", "") for u in stale[:3])
+                        + ". Устоял или сорвался — честно.", lambda: app.views["discipline"].set_tab("pvo"), "ПВО"))
+        m = self.money()
+        if m.get("entries"):
+            mm = self.money_month(today)
+            cur = self.money_cur()
+            if mm["limit"] and mm["spent"] > mm["limit"]:
+                out.append(("bad", f"Казна: перерасход месяца {fmt_money(mm['spent'] - mm['limit'], cur)}. До конца "
+                                   "месяца — только необходимое.", lambda: app._goto("money"), "Казна"))
+            elif mm["limit"] and mm["pace"] and mm["pace"] > 1.15 and today.day >= 5:
+                out.append(("warn", f"Казна: траты идут на {int(round((mm['pace'] - 1) * 100))}% быстрее лимита. "
+                                    f"В день — не больше {fmt_money(max(0, int(mm['per_day'])), cur)}.",
+                            lambda: app._goto("money"), "Казна"))
+            ready = [w for w in m.get("wishes") or [] if w.get("status") == "wait" and self.wish_ready(w)]
+            if ready:
+                out.append(("info", f"Желания ждут решения: {', '.join(w['title'] for w in ready[:3])}. Хочется так же — "
+                                    "купи осознанно, прошло — откажись.", lambda: app._goto("money"), "Казна"))
+        if self.fit_due(today):
+            last = self.fit_last_date()
+            out.append(("info", "Пора сдать нормативы по физподготовке" + (f": последняя проверка {last:%d.%m}" if last
+                                                                           else ": проверки ещё не было") + ".",
+                        app.fit_test, "Сдать"))
+        return out
+
+    def protocol_of_day(self, d):
+        ps = self.protocols()
+        return ps[d.toordinal() % len(ps)] if ps else None
+
+    def protocols(self, kind=None):
+        ps = [p for p in self.s["protocols"] if p.get("on", True)]
+        if kind is None:
+            return ps
+        return [p for p in ps if kind in (p.get("urges") or [])]
+
+    # --- боевые листы ---
+    def checklists(self, d=None, when=None):
+        out = []
+        for c in self.s["checklists"]:
+            if not c.get("on", True) or not c.get("items"):
+                continue
+            if d is not None and d.weekday() not in (c.get("days") or range(7)):
+                continue
+            if when is not None and c.get("when") != when:
+                continue
+            out.append(c)
+        return out
+
+    def checklist(self, cid):
+        return next((c for c in self.s["checklists"] if c.get("id") == cid), None)
+
+    def check_state(self, d, cid):
+        run = (self.s["check_runs"].get(d.isoformat()) or {}).get(cid) or []
+        return {i for i in run if isinstance(i, int)}
+
+    def check_set(self, d, cid, i, on):
+        runs = self.s["check_runs"]
+        day = runs.setdefault(d.isoformat(), {})
+        cur = set(day.get(cid) or [])
+        if on:
+            cur.add(int(i))
+        else:
+            cur.discard(int(i))
+        day[cid] = sorted(cur)
+        if len(runs) > 400:
+            for k in sorted(runs)[:-400]:
+                runs.pop(k, None)
+        self.invalidate()
+
+    def check_done(self, d, c):
+        n = len(c.get("items") or [])
+        return n > 0 and len(self.check_state(d, c["id"]) & set(range(n))) >= n
+
+    def checks_day(self, d):
+        """(закрыто листов, листов на день, отмечено пунктов, пунктов) — по листам, положенным на день d."""
+        lists = self.checklists(d)
+        done_l = items = marked = 0
+        for c in lists:
+            n = len(c["items"])
+            m = len(self.check_state(d, c["id"]) & set(range(n)))
+            items += n
+            marked += m
+            done_l += 1 if m >= n else 0
+        return done_l, len(lists), marked, items
+
+    def checks_streak(self, cid, today):
+        c = self.checklist(cid)
+        if c is None:
+            return 0
+        d = today if self.check_done(today, c) else today - timedelta(days=1)
+        n = 0
+        for _ in range(400):
+            if d.weekday() not in (c.get("days") or range(7)):
+                d -= timedelta(days=1)
+                continue
+            if not self.check_done(d, c):
+                break
+            n += 1
+            d -= timedelta(days=1)
+        return n
+
+    # --- физподготовка ---
+    def fit(self):
+        return self.s["fitness"]
+
+    def norms(self, all_=False):
+        return [n for n in self.fit()["norms"] if all_ or n.get("on", True)]
+
+    def norm(self, nid):
+        return next((n for n in self.fit()["norms"] if n.get("id") == nid), None)
+
+    def norm_by_name(self, query):
+        q = (query or "").strip().lower()
+        if not q:
+            return None
+        ns = self.norms(True)
+        return (next((n for n in ns if n["name"].lower() == q), None)
+                or next((n for n in ns if n["name"].lower().startswith(q)), None)
+                or next((n for n in ns if q in n["name"].lower()), None))
+
+    def fit_tests(self, nid):
+        return sorted((t for t in self.fit()["tests"] if t.get("norm") == nid), key=lambda t: (t["date"], t.get("ts", "")))
+
+    def fit_last(self, n):
+        tests = self.fit_tests(n["id"])
+        return tests[-1] if tests else None
+
+    def fit_best(self, n):
+        tests = self.fit_tests(n["id"])
+        if not tests:
+            return None
+        if n.get("better") == "less":
+            return min(tests, key=lambda t: t["value"])
+        if n.get("better") == "more":
+            return max(tests, key=lambda t: t["value"])
+        return tests[-1]
+
+    def fit_add(self, nid, d, value, note=""):
+        t = {"id": _sid(), "norm": nid, "date": d.isoformat(), "value": value, "note": (note or "")[:200],
+             "ts": PLATFORM["now"]().isoformat(timespec="seconds")}
+        self.fit()["tests"].append(t)
+        self.invalidate()
+        return t
+
+    def fit_last_date(self):
+        dates = [sys_date(t.get("date")) for t in self.fit()["tests"]]
+        dates = [d for d in dates if d]
+        return max(dates) if dates else None
+
+    def fit_due(self, today):
+        every = int(self.fit().get("every") or 0)
+        if not every or not self.norms():
+            return False
+        last = self.fit_last_date()
+        return last is None or (today - last).days >= every
+
+    def fit_summary(self):
+        """Оценки по последним замерам: [(норматив, последний замер, оценка 0–3)] и средняя оценка."""
+        rows, levels = [], []
+        for n in self.norms():
+            last = self.fit_last(n)
+            g = fit_grade(n, last["value"]) if last else None
+            rows.append((n, last, g))
+            if g is not None:
+                levels.append(g)
+        return rows, (sum(levels) / len(levels) if levels else None)
+
+    # --- казна ---
+    def money(self):
+        return self.s["money"]
+
+    def money_cur(self):
+        return self.money().get("currency") or "₽"
+
+    def money_cats(self):
+        return [c["name"] for c in self.money()["cats"]]
+
+    def money_cat(self, query):
+        q = (query or "").strip().lower()
+        if not q:
+            return None
+        cats = self.money_cats()
+        return (next((c for c in cats if c.lower() == q), None) or next((c for c in cats if c.lower().startswith(q)), None)
+                or next((c for c in cats if q in c.lower()), None))
+
+    def money_add(self, d, amount, cat, note="", impulse=False, kind="out", source=None):
+        e = {"id": _sid(), "date": d.isoformat(), "sum": round(float(amount), 2), "cat": cat or "Прочее",
+             "note": (note or "")[:200], "impulse": bool(impulse), "kind": kind,
+             "ts": PLATFORM["now"]().isoformat(timespec="seconds")}
+        if source:
+            e["src"] = source
+        m = self.money()
+        m["entries"].append(e)
+        if not m.get("since") or e["date"] < m["since"]:
+            m["since"] = e["date"]
+        self.invalidate()
+        return e
+
+    def money_entries(self, a, b, kind="out"):
+        ai, bi = a.isoformat(), b.isoformat()
+        return [e for e in self.money()["entries"] if ai <= e["date"] <= bi and (kind is None or e.get("kind") == kind)]
+
+    def money_spent(self, a, b, cat=None):
+        return sum(e["sum"] for e in self.money_entries(a, b) if cat is None or e.get("cat") == cat)
+
+    def money_by_cat(self, a, b):
+        acc = defaultdict(float)
+        for e in self.money_entries(a, b):
+            acc[e.get("cat") or "Прочее"] += e["sum"]
+        return acc
+
+    def money_since(self):
+        return sys_date(self.money().get("since"))
+
+    def nospend_days(self, a, b):
+        since = self.money_since()
+        if since is None:
+            return 0
+        spent = {e["date"] for e in self.money_entries(max(a, since), b)}
+        return sum(1 for d in self.dates(max(a, since), b) if d.isoformat() not in spent)
+
+    def nospend_streak(self, today):
+        since = self.money_since()
+        if since is None:
+            return 0
+        spent = {e["date"] for e in self.money()["entries"] if e.get("kind") == "out"}
+        d = today if today.isoformat() not in spent else None
+        if d is None:
+            return 0
+        n = 0
+        while d >= since and d.isoformat() not in spent:
+            n += 1
+            d -= timedelta(days=1)
+        return n
+
+    def money_month(self, today):
+        a, b = month_bounds(today)
+        m = self.money()
+        spent = self.money_spent(a, min(b, today))
+        limit = float(m.get("month_limit") or 0) or sum(c["limit"] for c in m["cats"])
+        days_left = (b - today).days + 1
+        spent_today = self.money_spent(today, today)
+        left = limit - spent if limit else None
+        per_day = math.floor((limit - (spent - spent_today)) / days_left) if limit else None
+        imp = [e for e in self.money_entries(a, b) if e.get("impulse")]
+        by_cat = self.money_by_cat(a, b)
+        cats = [(c["name"], by_cat.get(c["name"], 0.0), c["limit"]) for c in m["cats"]]
+        extra = [(k, v, 0.0) for k, v in by_cat.items() if k not in {c["name"] for c in m["cats"]}]
+        return {"a": a, "b": b, "spent": spent, "limit": limit, "left": left, "per_day": per_day,
+                "days_left": days_left, "today": spent_today, "impulse_n": len(imp),
+                "impulse_sum": sum(e["sum"] for e in imp), "cats": cats + extra,
+                "income": sum(e["sum"] for e in self.money_entries(a, b, "in")),
+                "nospend": self.nospend_days(a, min(b, today)),
+                "pace": (spent / limit) / (((today - a).days + 1) / ((b - a).days + 1)) if limit else None}
+
+    def wish_ready(self, w, now=None):
+        now = now or PLATFORM["now"]()
+        try:
+            added = datetime.fromisoformat(w.get("added") or "")
+        except ValueError:
+            return True
+        return now >= added + timedelta(hours=int(self.money().get("cooldown") or 0))
+
+    def money_saved(self):
+        return sum(float(w.get("price") or 0) for w in self.money()["wishes"] if w.get("status") == "dropped")
+
+    # --- короткие тексты для телефона, донесений и пакета для Claude ---
+    def pvo_text(self, today):
+        d0 = self.urge_stats(today, today)
+        w7 = self.urge_stats(today - timedelta(days=6), today)
+        lines = [f"ПВО: сегодня {d0['n']} {plural(d0['n'], ('перехват', 'перехвата', 'перехватов'))} "
+                 f"(устоял {d0['held']}, сорвался {d0['fell']}), без срыва {days_word(self.urge_clean_days(today))}",
+                 f"За 7 дней: {w7['n']}, удержание " + (f"{int(round(w7['rate'] * 100))}%" if w7["rate"] is not None
+                                                        else "—")]
+        if w7["kinds"]:
+            lines.append("Чаще всего: " + ", ".join(f"{k} {v[0]}" for k, v in w7["kinds"][:3]))
+        opened = self.urge_open()
+        if opened:
+            lines.append("Без итога: " + ", ".join(u.get("what", "") for u in opened[-3:]) + " — «устоял» или «сорвался»")
+        return "\n".join(lines)
+
+    def money_text(self, today):
+        cur = self.money_cur()
+        mm = self.money_month(today)
+        lines = [f"Казна, {MONTHS_NOM[today.month - 1].lower()}: потрачено {fmt_money(mm['spent'], cur)}"
+                 + (f" из {fmt_money(mm['limit'], cur)}" if mm["limit"] else "")]
+        if mm["limit"]:
+            lines.append(f"Можно в день до конца месяца: {fmt_money(max(0, int(mm['per_day'])), cur)}; сегодня "
+                         f"{fmt_money(mm['today'], cur)}")
+        lines.append(f"Без трат подряд: {days_word(self.nospend_streak(today))}; импульсных за месяц {mm['impulse_n']} "
+                     f"на {fmt_money(mm['impulse_sum'], cur)}")
+        top = sorted((x for x in mm["cats"] if x[1]), key=lambda x: -x[1])[:4]
+        if top:
+            lines.append("Больше всего: " + ", ".join(f"{n} {fmt_money(v, cur)}" for n, v, _l in top))
+        return "\n".join(lines)
+
+    def fit_text(self, today):
+        rows, avg = self.fit_summary()
+        last = self.fit_last_date()
+        lines = ["Физподготовка: " + (f"оценка «{FIT_GRADES[int(round(avg))]}» ({fmt_num(avg)} из 3)" if avg is not None
+                                      else "оценки пока нет")
+                 + (f", последняя проверка {last:%d.%m}" if last else "")]
+        for n, lt, g in rows:
+            if lt:
+                lines.append(f"  {n['name']}: {fmt_fit_value(n['kind'], lt['value'])}"
+                             + (f" — {FIT_GRADES[g]}" if g is not None else ""))
+        if self.fit_due(today):
+            lines.append("Пора сдать нормативы: «норматив подтягивания 12», «вес 73,5».")
+        return "\n".join(lines)
+
+    def dossier_text(self, today):
+        r = self.rank(today)
+        got = [x.get("title") for x in self.s["rewards"] if x.get("got")]
+        lines = [f"Личное дело: {r['name']}, опыт {r['xp']}" + (f" (выслуга {r['carry']})" if r["carry"] else ""),
+                 f"Кампаний в послужном списке: {len(self.s.get('campaigns') or [])}; текущая — {self.name()}",
+                 "Награды: " + (", ".join(got) if got else "пока нет")]
+        if r["next"]:
+            lines.append(f"До звания «{r['next']}»: {r['hi'] - r['xp']} очков")
+        return "\n".join(lines)
+
+    # --- опыт за дисциплину вне часов ---
+    def kit_xp(self, a, b):
+        """Перехват выдержан — 5 (до 5 в день), лист закрыт — 5, день с замерами физподготовки — 20."""
+        held = defaultdict(int)
+        for u in self.urges():
+            d = self.urge_day(u)
+            if d and a <= d <= b and u.get("result") == "held":
+                held[d] += 1
+        xp = sum(min(5, n) for n in held.values()) * 5
+        for k, run in self.s["check_runs"].items():
+            d = sys_date(k)
+            if not d or not a <= d <= b:
+                continue
+            for cid in run:
+                c = self.checklist(cid)
+                if c is not None and self.check_done(d, c):
+                    xp += 5
+        fit_days = {t["date"] for t in self.fit()["tests"] if a.isoformat() <= t["date"] <= b.isoformat()}
+        return xp + 20 * len(fit_days)
+
+    # --- послужной список и смена кампании ---
+    def campaign_summary(self, today):
+        a, b = self.start(), self.end()
+        upto = min(today, b)
+        r = self.rank(today)
+        pens = self.penalties(today)
+        days = [d for d in self.dates(a, upto)]
+        return {"name": self.name(), "start": a.isoformat(), "end": b.isoformat(),
+                "goal_hours": self.goal("hours", 0), "hours": round(self.hours_total(), 1),
+                "plan_hours": round(self.plan_between(a, upto), 1), "days": len(days),
+                "good_days": self.good_days(today), "checkins": self.checkins_between(a, upto) if days else 0,
+                "trainings": self.trainings_between(a, upto) if days else 0,
+                "xp": r["xp"], "gross": r["gross"], "rank": r["name"], "penalty": sum(p for _d, p, _t in pens),
+                "reserve_used": len(self.reserve_cfg()["used"]),
+                "duties_done": sum(1 for x in self.duties() if x.get("status") == "done"),
+                "duties_failed": sum(1 for x in self.duties() if x.get("status") == "failed"),
+                "best_streak": self.best_streak(self.good_day, a, upto),
+                "review": dict(self.s.get("final_review") or {}), "closed": today.isoformat()}
+
+    def best_streak(self, pred, a, b):
+        best = run = 0
+        for d in self.dates(a, b):
+            if pred(d):
+                run += 1
+                best = max(best, run)
+            else:
+                run = 0
+        return best
+
+    def schedule_campaign(self, **plan):
+        """Следующая кампания начнётся сама, когда кончится текущая (или в день своего старта)."""
+        self.s["next_campaign"] = {k: (v.isoformat() if isinstance(v, date) else v) for k, v in plan.items()}
+        self.journal_add("campaign", f"запланирована кампания «{plan.get('name')}» с {plan['start']:%d.%m.%Y}")
+        self.invalidate()
+
+    def maybe_switch(self, today):
+        """Пора развернуть запланированную кампанию? True — развернули."""
+        nxt = self.s.get("next_campaign") or {}
+        st, en = sys_date(nxt.get("start")), sys_date(nxt.get("end"))
+        if not st or not en or (today <= self.end() and today < st):
+            return False
+        self.s["next_campaign"] = {}
+        self.start_campaign(today, nxt.get("name") or CAMPAIGN, st, en, float(nxt.get("hours") or 0),
+                            int(nxt.get("reserve") or 0), carry_xp=bool(nxt.get("carry_xp", True)),
+                            phase=nxt.get("phase") or "Развёртывание", focus=nxt.get("focus") or "",
+                            reset_rules_text=bool(nxt.get("reset_rules_text")))
+        return True
+
+    def start_campaign(self, today, name, start, end, hours, reserve, carry_xp=True, phase="Развёртывание",
+                       focus="", reset_rules_text=False):
+        """Итоги текущей кампании — в послужной список, опыт — в выслугу, дальше новая кампания с теми же
+        направлениями, режимами дня, расписанием, курсами и привычками."""
+        summary = self.campaign_summary(today)
+        self.s["campaigns"].append(summary)
+        if carry_xp:
+            # выслуга — весь опыт на момент смены кампании (с прошлой выслугой и за вычетом штрафов)
+            self.s["xp_carry"] = max(0, int(summary["xp"]))
+        cur = self.phase_at(min(max(today, self.start()), self.end()))
+        idx = cur["i"] if cur else 0
+        for k, vals in list(self.s["budgets"].items()):
+            vals = list(vals or [])
+            self.s["budgets"][k] = [vals[idx] if idx < len(vals) else 0]
+        self.s["phases"] = [{"name": phase or "Развёртывание", "start": start.isoformat(), "focus": focus or ""}]
+        for duty in self.duties_open():
+            duty["status"] = "cancelled"
+            duty["closed"] = today.isoformat()
+            duty["note"] = "смена кампании"
+        self.s.update(name=name, start=start.isoformat(), end=end.isoformat(), final_review={}, rank_seen=-1,
+                      alarms={}, backplan_asked={})
+        self.s["goals"]["hours"] = hours
+        self.s["reserve"] = {"base": int(reserve), "used": {}}
+        if reset_rules_text:
+            self.s["rules_text"] = ""
+        self.journal_add("campaign", f"новая кампания «{name}»: {start:%d.%m.%Y}–{end:%d.%m.%Y}, цель {fmt_h(hours)} ч; "
+                                     f"итоги «{summary['name']}» — в послужном списке")
+        self.invalidate()
+        return summary
+
+
+class System(CampaignMixin, KitMixin):
     """Кампания поверх данных Генштаба: цели, этапы, бюджеты, дневник, рубежи, сеть, дисциплина."""
 
     def __init__(self, app):
@@ -8295,7 +9438,7 @@ class System(CampaignMixin):
     def day_met(self, d):
         """День выполнен: часы дошли до 97% плана (выходной по плану выполнен всегда)."""
         plan = self.day_plan(d)
-        return plan <= 0 or self.hours_on(d) >= plan * 0.97 - 1e-9
+        return plan <= 0 or self.hours_on(d) >= plan * self.rule("met_share") / 100 - 1e-9
 
     def plan_between(self, a, b):
         a, b = max(a, self.start()), min(b, self.end())
@@ -8571,7 +9714,7 @@ class System(CampaignMixin):
         wake, goal = parse_hm(self.day(d).get("wake")), parse_hm(self.s["goals"].get("wake"), (7, 0))
         if not wake or not goal:
             return False
-        return (wake[0] * 60 + wake[1]) - (goal[0] * 60 + goal[1]) <= 30
+        return (wake[0] * 60 + wake[1]) - (goal[0] * 60 + goal[1]) <= self.rule("wake_slack")
 
     # --- оценки ---
     def course_for_project(self, project):
@@ -8655,12 +9798,18 @@ class System(CampaignMixin):
             out.append(("info", f"Старт кампании {start:%d.%m}. До него — разобрать силлабусы, вписать даты рубежей "
                                 f"и прочитать Устав.", lambda: app.views["system"].set_tab("plan"), "Устав"))
             return out
+        nxt = self.s.get("next_campaign") or {}
         if today > end:
-            out.append(("info", "Кампания завершена: итоговый разбор, записка по треку и план на 2027.", None, None))
+            out.append(("bad", f"{self.name()} завершена. Итоговый разбор — в послужной список, опыт — в выслугу, "
+                               "и новая кампания: без неё нет нормы, нарядов и приказа.",
+                        app.new_campaign, "Новая кампания"))
             return out
+        if self.days_to_finish(today) <= 7 and not nxt:
+            out.append(("warn", f"До финиша {days_word(self.days_to_finish(today))}. Итоговый разбор и план следующей "
+                                "кампании — заранее, чтобы первого дня не было пустым.", app.new_campaign, "Спланировать"))
         y = today - timedelta(days=1)
         opened = self.duties_open()
-        if len(opened) >= DUTY_CAP:
+        if len(opened) >= self.rule("duty_cap"):
             out.append(("bad", f"Нарядов открыто {len(opened)} — потолок. Не дави сильнее: объяви оборону или "
                                "резерв и пересобери нагрузку в «Уставе».", lambda: app.views["system"].set_tab("duty"),
                         "Наряды"))
@@ -8717,8 +9866,8 @@ class System(CampaignMixin):
                                    "на оставшемся. Первый утренний блок — ему.", lambda: app._goto("grades"), "Рубежи"))
             elif (calc["current_grade"] is not None and calc["graded_share"] >= 0.15
                   and calc["current_grade"] < self.goal("grade_min", 8)):
-                out.append(("bad", f"{c['name']}: сейчас выходит {calc['current_grade']}. "
-                                   "Первый утренний блок каждый день, пока не вернётся к 8.",
+                out.append(("bad", f"{c['name']}: сейчас выходит {calc['current_grade']}. Первый утренний блок "
+                                   f"каждый день, пока не вернётся к {fmt_h(self.goal('grade_min', 8))}.",
                             lambda: app._goto("grades"), "Рубежи"))
         if missing:
             out.append(("warn", "Нет формулы оценки: " + ", ".join(missing) + ".",
@@ -8757,6 +9906,7 @@ class System(CampaignMixin):
             if done < expected * 0.6:
                 out.append(("warn", f"Касания: {done} из {target} на этой неделе, к сегодня ожидалось "
                                     f"около {int(round(expected))}.", lambda: app._goto("network"), "Сеть"))
+        out += self.kit_alerts(today)
         overdue = [r for r in self.calendar() if r["date"] and r["date"] < today and not r["done"]
                    and r["status"] not in ("Перенесено",)]
         if overdue:
@@ -8852,7 +10002,8 @@ class System(CampaignMixin):
         wake, goal = parse_hm(rec.get("wake")), parse_hm(self.s["goals"].get("wake"), (7, 0))
         if wake and goal:
             late = (wake[0] * 60 + wake[1]) - (goal[0] * 60 + goal[1])
-            parts["wake"] = (1.0 if late <= 30 else max(0.0, 1 - (late - 30) / 60), f"подъём {rec['wake']}")
+            slack = self.rule("wake_slack")
+            parts["wake"] = (1.0 if late <= slack else max(0.0, 1 - (late - slack) / 60), f"подъём {rec['wake']}")
         else:
             parts["wake"] = (0.0, "подъём не отмечен")
         if plan > 0:
@@ -8871,6 +10022,11 @@ class System(CampaignMixin):
         cards = self.cards_part(d)
         if cards is not None:
             parts["cards"] = cards
+        since = sys_date(self.coach.get("lists_since"))
+        if float(w.get("lists", 0) or 0) > 0 and since and d >= since:
+            _dl, _nl, marked, items = self.checks_day(d)
+            if items:
+                parts["lists"] = (marked / items, f"боевые листы {marked} из {items}")
         total = sum(max(0.0, float(w.get(k, 0) or 0)) for k in parts)
         score = sum(max(0.0, float(w.get(k, 0) or 0)) * p for k, (p, _t) in parts.items())
         return (int(round(100 * score / total)) if total else 0), parts
@@ -8916,7 +10072,7 @@ class System(CampaignMixin):
         return int(self.hours_total() * 10 + self.touches_total() * 5 + self.touches_total(calls=True) * 15
                    + self.trainings_between(self.start(), upto) * 15
                    + self.checkins_between(self.start(), upto) * 10 + cps * 50 + graded * 20
-                   + self.good_days(today) * 20)
+                   + self.good_days(today) * 20 + self.kit_xp(self.start(), upto))
 
     def reward_value(self, kind, today):
         if kind == "hours":
@@ -9007,7 +10163,7 @@ class System(CampaignMixin):
                     nxt = min(en, cur.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
                     per_hour[cur.hour] += mins * (nxt - cur).total_seconds() / span
                     cur = nxt
-            if starts and self.day_type(d) not in ("Пары",):
+            if starts and self.day_type(d) not in ("Марш", "Пары"):
                 first.append(min(starts))
         total = sum(per_hour)
         if total >= 300:
@@ -9103,6 +10259,7 @@ class System(CampaignMixin):
                                                                mit.get("status") == "done" else ""))
         if rec.get("note"):
             lines.append("Итог: " + rec["note"])
+        lines += self.kit_report_lines(d, d)
         r = self.rank(d)
         lines.append(f"Звание: {r['name']} · резерв {self.reserve_left(d)} · нарядов {len(self.duties_open())}")
         lines.append(f"Всего: {fmt_h(self.hours_total())} ч из {int(self.goal('hours', 750))}"
@@ -9147,6 +10304,7 @@ class System(CampaignMixin):
         skips = len(self.journal_between(a, b, "skip")) + len(self.journal_between(a, b, "snooze"))
         if skips:
             lines.append(f"Отговорок в журнале: {skips}")
+        lines += self.kit_report_lines(a, b)
         return "\n".join(lines)
 
     # --- 7.0: короткие тексты для телефона и выгрузка дневника ---
@@ -9246,7 +10404,8 @@ class System(CampaignMixin):
                      ("food", "Питание"), ("energy", "Энергия"), ("touches", "Касания"), ("calls", "Созвоны"),
                      ("distract", "Залипание, мин"), ("first_active", "Первое действие"),
                      ("last_active", "Последняя активность"), ("promise", "Обещал утром, ч"),
-                     ("mit", "Главное на день"), ("note", "Итог дня")]
+                     ("mit", "Главное на день"), ("note", "Итог дня"), ("urges", "Перехватов"), ("fell", "Срывов"),
+                     ("lists", "Листов закрыто"), ("spent", "Траты")]
 
     def diary_rows(self, today):
         out = []
@@ -9268,6 +10427,11 @@ class System(CampaignMixin):
                         "first_active": rec.get("first_active") or "", "last_active": rec.get("last_active") or "",
                         "promise": fmt_plain(rec.get("promise")) if rec.get("promise") else "",
                         "mit": rec.get("mit_text") or "", "note": rec.get("note") or ""})
+            st = self.urge_stats(d, d)
+            dl, nl, _m, _i = self.checks_day(d)
+            spent = self.money_spent(d, d)
+            out[-1].update(urges=st["n"] or "", fell=st["fell"] or "", lists=f"{dl} из {nl}" if nl else "",
+                           spent=fmt_plain(round(spent, 2)) if spent else "")
         return out
 
 
@@ -9376,12 +10540,13 @@ class Bar(tk.Canvas):
 class FormDialog(tk.Toplevel):
     """Форма из списка полей. on_save(values) может вернуть False, чтобы окно не закрывалось.
 
-    Поле: {"key", "label", "kind": entry|date|time|int|float|combo|text|check, "value", "options",
+    Поле: {"key", "label", "kind": entry|date|time|int|float|combo|text|check|section, "value", "options",
            "hint", "width", "lo", "hi", "optional", "required", "height", "free"}.
+    section — заголовок группы полей без значения. scroll=True — длинная форма с прокруткой, кнопки внизу.
     """
 
     def __init__(self, app, title, fields, on_save, on_delete=None, note=None, width=44, delete_text="Удалить",
-                 ok_text="Сохранить"):
+                 ok_text="Сохранить", scroll=False, extra_buttons=None):
         ensure_visible(app)
         super().__init__(app)
         self.app = app
@@ -9393,7 +10558,8 @@ class FormDialog(tk.Toplevel):
         self.configure(bg=C.BG)
         self.transient(app)
         self.resizable(False, False)
-        body = tk.Frame(self, bg=C.BG, padx=px(22), pady=px(18))
+        self._sf = ScrollFrame(self) if scroll else None
+        body = tk.Frame(self._sf.inner if scroll else self, bg=C.BG, padx=px(22), pady=px(18))
         body.pack(fill="both", expand=True)
         body.columnconfigure(1, weight=1)
         row = 0
@@ -9405,6 +10571,15 @@ class FormDialog(tk.Toplevel):
         first = None
         for f in fields:
             kind = f.get("kind", "entry")
+            if kind == "section":
+                tk.Label(body, text=f.get("label", ""), font=F["ui_bold"], bg=C.BG, fg=C.FOCUS, anchor="w").grid(
+                    row=row, column=0, columnspan=2, sticky="we", pady=(px(12) if row else 0, px(2)))
+                row += 1
+                if f.get("hint"):
+                    tk.Label(body, text=f["hint"], font=F["small"], bg=C.BG, fg=C.MUTED, anchor="w", justify="left",
+                             wraplength=px(520)).grid(row=row, column=0, columnspan=2, sticky="w")
+                    row += 1
+                continue
             if kind != "check":
                 tk.Label(body, text=f.get("label", ""), font=F["ui"], bg=C.BG, fg=C.MUTED, anchor="nw").grid(
                     row=row, column=0, sticky="nw", padx=(0, px(14)), pady=px(5))
@@ -9449,13 +10624,25 @@ class FormDialog(tk.Toplevel):
                 tk.Label(body, text=f["hint"], font=F["small"], bg=C.BG, fg=C.MUTED, anchor="w", justify="left",
                          wraplength=px(420)).grid(row=row, column=1, sticky="w")
                 row += 1
-        btns = tk.Frame(body, bg=C.BG)
-        btns.grid(row=row, column=0, columnspan=2, sticky="we", pady=(px(16), 0))
+        if scroll:
+            btns = tk.Frame(self, bg=C.BG, padx=px(22), pady=px(12))
+            btns.pack(side="bottom", fill="x")
+            tk.Frame(self, bg=C.LINE, height=1).pack(side="bottom", fill="x")
+        else:
+            btns = tk.Frame(body, bg=C.BG)
+            btns.grid(row=row, column=0, columnspan=2, sticky="we", pady=(px(16), 0))
         if on_delete:
             ttk.Button(btns, text=delete_text, command=self._delete).pack(side="left")
+        for label, cmd in extra_buttons or []:
+            ttk.Button(btns, text=label, command=lambda c=cmd: c(self)).pack(side="left", padx=(0, px(8)))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right")
         ttk.Button(btns, text=ok_text, style="Work.TButton", command=self._save).pack(side="right",
                                                                                          padx=(0, px(8)))
+        if scroll:
+            self._sf.pack(fill="both", expand=True)
+            self.update_idletasks()
+            h = min(body.winfo_reqheight(), int(self.winfo_screenheight() * 0.68))
+            self._sf.canvas.configure(width=body.winfo_reqwidth(), height=h)
         self.bind("<Escape>", lambda e: self.destroy())
         self.bind("<Return>", self._on_return)
         coach = getattr(app, "coach", None)
@@ -9482,7 +10669,9 @@ class FormDialog(tk.Toplevel):
     def values(self):
         out = {}
         for f in self.fields:
-            key, kind = f["key"], f.get("kind", "entry")
+            key, kind = f.get("key"), f.get("kind", "entry")
+            if kind == "section":
+                continue
             w = self.widgets[key]
             if kind == "text":
                 out[key] = w.get("1.0", "end").strip()
@@ -9689,8 +10878,14 @@ class CheckinForm(tk.Frame):
                                                                                     padx=(px(12), px(6)))
             self.t_mit = tk.StringVar(value=trec.get("mit_text") or "")
             ttk.Entry(nrow, textvariable=self.t_mit, font=F["ui"]).pack(side="left", fill="x", expand=True)
+        lists = sysm.checklists(d, "evening") if (sysm.coach.get("lists") or {}).get("evening", True) else []
+        if lists:
+            box = tk.Frame(self, bg=bg)
+            box.grid(row=12, column=0, columnspan=2, sticky="we", pady=(px(10), 0))
+            for c in lists:
+                ChecklistCard(box, app, c, d).pack(fill="x", pady=(0, px(4)))
         btns = tk.Frame(self, bg=bg)
-        btns.grid(row=12, column=0, columnspan=2, sticky="we", pady=(px(16), 0))
+        btns.grid(row=13, column=0, columnspan=2, sticky="we", pady=(px(16), 0))
         ttk.Button(btns, text="Доложить", style="Work.TButton", command=self._save).pack(side="right")
         ttk.Button(btns, text="Карточки", command=app.open_cards).pack(side="left")
         if not lock:
@@ -9736,7 +10931,7 @@ class CheckinForm(tk.Frame):
             except ValueError:
                 messagebox.showwarning(APP_NAME, "Без таймера — число часов, например 1,5.", parent=parent)
                 return
-        if extra > 0 and len(self.extra_note.get().strip()) < 8:
+        if extra > 0 and len(self.extra_note.get().strip()) < 8 and sysm.rule("result_required"):
             messagebox.showwarning(APP_NAME, "Без таймера: впиши результат — что сделано (факт, а не ощущение). "
                                              "Часы без результата не принимаются.", parent=parent)
             return
@@ -10366,6 +11561,13 @@ class MorningForm(tk.Frame):
                 side="left", anchor="n")
             tk.Label(row, text=text, font=F["small"], bg=C.SURFACE, fg=C.INK, anchor="w", justify="left",
                      wraplength=px(430)).pack(side="left", fill="x", expand=True)
+        proto = sysm.protocol_of_day(today)
+        if proto:
+            tk.Label(self, text=f"Протокол дня: если {lc_first(proto['if'])} — {proto['then']}", font=F["small"],
+                     bg=bg, fg=C.FOCUS, anchor="w", justify="left", wraplength=px(580)).pack(fill="x", pady=(px(6), 0))
+        if (sysm.coach.get("lists") or {}).get("morning", True):
+            for c in sysm.checklists(today, "morning"):
+                ChecklistCard(self, app, c, today).pack(fill="x", pady=(px(8), 0))
         form = tk.Frame(self, bg=bg)
         form.pack(fill="x", pady=(px(10), 0))
         form.columnconfigure(1, weight=1)
@@ -10444,7 +11646,7 @@ class MorningForm(tk.Frame):
             messagebox.showwarning(APP_NAME, "Норма — число часов.", parent=self)
             return
         title = self.mit_var.get().strip()
-        if not title and sysm.active(self.day) and sysm.day_plan(self.day) > 0:
+        if not title and sysm.active(self.day) and sysm.day_plan(self.day) > 0 and sysm.rule("morning_required"):
             messagebox.showwarning(APP_NAME, "Главный удар: одна задача, которую сегодня нужно довести. Без него "
                                              "построение не принимается.", parent=self)
             return
@@ -11511,6 +12713,11 @@ class Coach:
 
     def assault_hook(self, on):
         """Штурм начался или кончился: status.json и команды из «Дежурный → Связка с другими программами»."""
+        if on:
+            try:
+                self._assault_list()
+            except Exception:
+                traceback.print_exc()
         cfg = self.cfg("hooks")
         app = self.app
         p = app.pomo
@@ -11533,6 +12740,24 @@ class Coach:
                              stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
         except OSError as exc:
             app.toast(f"Связка: команда не запустилась ({exc})", ms=8000)
+
+    def _assault_list(self):
+        """Лист «перед штурмом» — карточкой в начале первого штурма за день, если включено."""
+        app, sysm = self.app, self.app.system
+        if not (self.cfg("lists").get("assault")) or self.paused():
+            return
+        today = app.today()
+        lists = [c for c in sysm.checklists(today, "assault") if not sysm.check_done(today, c)]
+        if not lists or ("assault_list", today) in self.prompted:
+            return
+        self.prompted.add(("assault_list", today))
+        c = lists[0]
+
+        def all_done():
+            for i in range(len(c["items"])):
+                app.check_toggle(today, c, i, True, quiet=True)
+        self.show_card("assault_list", f"{c['title']}: проверка", "\n".join(f"• {x}" for x in c["items"]),
+                       [("Всё готово", all_done), ("Не сейчас", None)], level=1, timeout=90, priority=1, motivate=False)
 
     # --- Telegram ---
     def tg_send(self, chat, text, done=None):
@@ -11816,7 +13041,7 @@ def guard_exists():
 
 
 # Слова, с которых начинается новый факт. «созвон» и «встреча» сюда не входят: в «касание Иван созвон» это вид касания.
-FACT_WORDS = r"(?:сон|подъём|подъем|трен|тренировка|еда|питание|энергия|итог|главное|день|касание)"
+FACT_WORDS = r"(?:сон|подъём|подъем|трен|тренировка|еда|питание|энергия|итог|главное|день|касание|вес|трата)"
 
 
 def split_facts(text):
@@ -11867,6 +13092,12 @@ BOT_HELP = """Генштаб на связи. Пиши сюда факты — �
   карточки — повторение в дороге: вопрос → любой ответ → оценка 1–4; «стоп» — закончить
   вопрос :: ответ — новая карточка во «Входящие»
   узнал: найм: у них всё через стажировку · обещал: прислать резюме Ивану
+
+Дисциплина и тыл
+  перехват ютуб 4 — соблазн на перехвате, через 10 минут спрошу итог · устоял · сорвался · пво
+  листы — боевые листы на сегодня · лист осмотр всё · лист поверка 1 3 · протоколы
+  трата 350 кафе шаурма (в конце «!» — импульс) · доход 5000 · казна
+  вес 73,5 · норматив подтягивания 14 · физо · дело — личное дело
 
 Сводки
   отчёт · неделя · пауза 60 · пауза утро · сокращения"""
@@ -11974,7 +13205,8 @@ class TelegramBot:
             if word in ("стоп", "stop", "хватит", "конец"):
                 return self.review.finish()
             if word not in ("статус", "status", "план", "plan", "приказ", "отчёт", "отчет", "неделя", "week", "help",
-                            "start", "помощь", "разведка", "звание", "наряды", "резерв") \
+                            "start", "помощь", "разведка", "звание", "наряды", "резерв", "перехват", "устоял",
+                            "сорвался", "трата", "пво", "казна") \
                     and not text.strip().startswith("+"):
                 return self.review.handle(text, when)
         if word in ("карточки", "повтор", "повторение", "cards", "review"):
@@ -12036,6 +13268,20 @@ class TelegramBot:
             return self.undo()
         if word in ("отметка", "сводка", "доклад", "checkin"):
             return self.checkin(rest, today)
+        if word in ("пво", "перехваты") and not rest:
+            return sysm.pvo_text(app.today())
+        if word in ("казна", "деньги", "бюджет") and not rest:
+            return sysm.money_text(app.today())
+        if word in ("физо", "физподготовка", "нормативы") and not rest:
+            return sysm.fit_text(app.today())
+        if word in ("листы", "лист"):
+            return self.lists(rest)
+        if word in ("протоколы", "протокол") and not rest:
+            ps = sysm.protocols()
+            return "Протоколы «если — то»:\n" + "\n".join(f"• если {lc_first(p['if'])} — {p['then']}"
+                                                         for p in ps) if ps else "Протоколов нет."
+        if word in ("дело", "личное", "послужной") and not rest:
+            return sysm.dossier_text(app.today())
         results, errors, unknown = [], [], []
         for part in split_facts(text):
             r = app.quick_entry(part, when=when, day=today, source="phone")
@@ -12062,6 +13308,36 @@ class TelegramBot:
         if results and sysm.active(today):
             out.append(f"Сегодня {fmt_h(sysm.hours_on(today))} из {fmt_h(sysm.day_plan(today))} ч.")
         return " ".join(out)
+
+    def lists(self, rest):
+        """«листы» — что сегодня закрыто; «лист осмотр всё» или «лист поверка 1 3» — отметить пункты."""
+        app, sysm = self.app, self.app.system
+        today = app.today()
+        due = sysm.checklists(today)
+        if not rest:
+            if not due:
+                return "На сегодня боевых листов нет."
+            lines = []
+            for c in due:
+                st = sysm.check_state(today, c["id"])
+                lines.append(f"{c['title']}: {len(st & set(range(len(c['items']))))} из {len(c['items'])}")
+                lines += [f"  {i + 1}. {'[x]' if i in st else '[ ]'} {item}" for i, item in enumerate(c["items"])]
+            return "\n".join(lines) + "\nОтметить: «лист осмотр всё» или «лист поверка 1 3»."
+        words = rest.split()
+        marks = [w for w in words if w.isdigit() or w.lower() in ("всё", "все", "all")]
+        name = " ".join(w for w in words if w not in marks).lower()
+        c = next((c for c in due if name and (c["title"].lower().startswith(name)
+                                               or any(w.startswith(name) for w in c["title"].lower().split()))), None)
+        if c is None:
+            return "Не нашёл лист «" + name + "». Сегодня: " + ", ".join(c["title"] for c in due) + "."
+        idx = range(len(c["items"])) if any(w.lower() in ("всё", "все", "all") for w in marks) else \
+            [int(w) - 1 for w in marks if 0 < int(w) <= len(c["items"])]
+        for i in idx:
+            app.check_toggle(today, c, i, True, quiet=True)
+        app._sys_changed()
+        st = sysm.check_state(today, c["id"])
+        return f"{c['title']}: {len(st & set(range(len(c['items']))))} из {len(c['items'])}" + (
+            " — закрыт, +5 опыта." if sysm.check_done(today, c) else ".")
 
     def checkin(self, rest, day):
         app, sysm = self.app, self.app.system
@@ -12129,10 +13405,11 @@ class TelegramBot:
         today = app.today()
         m = re.fullmatch(r"\s*(\d+(?:[.,]\d+)?)\s*(.*)", rest or "")
         if not m:
-            return "Перенос: «перенос 2 причина» — до 3 часов недобора на два следующих дня."
+            return (f"Перенос: «перенос 2 причина» — до {fmt_h(sysm.rule('carry_max_day'))} ч недобора на "
+                    f"{sysm.rule('carry_days')} следующих дня.")
         hours = float(m[1].replace(",", "."))
         reason = m[2].strip()
-        day = today if when >= at_time(today, CARRY_FROM) else today - timedelta(days=1)
+        day = today if when >= at_time(today, sysm.rule("carry_from")) else today - timedelta(days=1)
         allowed, why = sysm.carry_info(day, when)
         if allowed <= 0:
             return f"Перенос не принят: {why}."
@@ -12147,8 +13424,9 @@ class TelegramBot:
         duty = next((d for d in sysm.duties_open() if d.get("kind") == "write"), None)
         if duty is None:
             return "Открытых письменных разборов нет."
-        if len(text) < WRITE_MIN:
-            return f"Разбор короткий: {len(text)} знаков из {WRITE_MIN}. Что помешало, что меняю, как проверю."
+        need = sysm.rule("write_min")
+        if len(text) < need:
+            return f"Разбор короткий: {len(text)} знаков из {need}. Что помешало, что меняю, как проверю."
         sysm.duty_close(duty, "done", text)
         app._sys_changed()
         return f"Наряд выполнен: {duty['title']}."
@@ -17867,8 +19145,8 @@ class SystemView(tk.Frame):
     """Ставка: как идёт кампания — приказ, фронты, разведка, наряды, дневник, навыки, календарь, дежурный, устав."""
 
     TABS = [("overview", "Сводка"), ("fronts", "Фронты"), ("intel", "Разведка"), ("duty", "Наряды"),
-            ("diary", "Дневник"), ("skills", "Навыки"), ("calendar", "Календарь"), ("discipline", "Дежурный"),
-            ("plan", "Устав")]
+            ("dossier", "Личное дело"), ("diary", "Дневник"), ("skills", "Навыки"), ("calendar", "Календарь"),
+            ("discipline", "Дежурный"), ("plan", "Устав")]
     CAL_FILTERS = [("upcoming", "Предстоящие"), ("undated", "Без даты"), ("all", "Все")]
 
     def __init__(self, master, app):
@@ -17921,7 +19199,7 @@ class SystemView(tk.Frame):
         today = app.today()
         total = sysm.total_days()
         if today < sysm.start():
-            days = f"{CAMPAIGN}: старт {sysm.start():%d.%m}, {total} {plural(total, DAY_FORMS)}"
+            days = f"{sysm.name()}: старт {sysm.start():%d.%m}, {total} {plural(total, DAY_FORMS)}"
         else:
             days = sysm.campaign_line(today)
         self.days_lbl.configure(text=days)
@@ -18529,7 +19807,7 @@ class SystemView(tk.Frame):
                  "Подъём в среднем: " + (f"{int(sum(wakes) / len(wakes)) // 60:02d}:{int(sum(wakes) / len(wakes)) % 60:02d}"
                                          if wakes else "—") + f" (цель {sysm.s['goals'].get('wake') or '07:00'})",
                  f"Питание: {fmt_num(sum(food) / len(food)) if food else '—'} из 5",
-                 f"Оборон за 7 дней: {sysm.defense_count(today)} из {DEFENSE_FREE} бесплатных"]
+                 f"Оборон за 7 дней: {sysm.defense_count(today)} из {sysm.rule('defense_free')} бесплатных"]
         for line in lines:
             ui_text(card, app, line, fg=C.INK).pack(fill="x", pady=px(1))
 
@@ -18715,7 +19993,8 @@ class SystemView(tk.Frame):
         tk.Label(card, text=r["name"], font=F["h1"], bg=C.SURFACE, fg=C.INK, anchor="w").pack(fill="x")
         Bar(card, app, (r["xp"] - r["lo"]) / max(1, r["hi"] - r["lo"]), C.LONG).pack(fill="x", pady=(px(4), px(6)))
         pens = sysm.penalties(today)
-        ui_text(card, app, f"Опыт {r['xp']} = {r['gross']} заработано − {r['gross'] - r['xp']} штрафов."
+        ui_text(card, app, f"Опыт {r['xp']} = {r['gross']} заработано" + (f" + {r['carry']} выслуга" if r["carry"] else "")
+                + f" − {r['pen']} штрафов."
                 + (f" До звания «{r['next']}» — {r['hi'] - r['xp']} очков." if r["next"] else ""), fg=C.INK).pack(fill="x")
         ui_text(card, app, "Опыт: час — 10, сводка — 10, засчитанный день — 20, тренировка — 15, точка навыка — 50, "
                            "оценка — 20. Штрафы снимают опыт, звание может упасть.").pack(fill="x", pady=(px(4), 0))
@@ -18737,8 +20016,9 @@ class SystemView(tk.Frame):
         tk.Label(card, text=f"{left} из {sysm.reserve_total(today)}", font=F["h1"], bg=C.SURFACE, fg=C.INK,
                  anchor="w").pack(fill="x")
         ui_text(card, app, f"База {sysm.reserve_cfg().get('base')} + заработано за серии {sysm.reserve_earned(today)} "
-                           f"(каждые {RESERVE_EARN_STREAK} засчитанных дней подряд, до +{RESERVE_EARN_CAP}). Резерв — "
-                           f"день без нормы: серия не рвётся, наряда нет. На сегодня — до {RESERVE_DEADLINE}.",
+                           f"(каждые {sysm.rule('reserve_earn_streak')} засчитанных дней подряд, до "
+                           f"+{sysm.rule('reserve_earn_cap')}). Резерв — день без нормы: серия не рвётся, наряда нет. "
+                           f"На сегодня — до {sysm.rule('reserve_deadline')}.",
                 fg=C.INK).pack(fill="x")
         used = sorted(sysm.reserve_cfg()["used"].items())
         for k, reason in used:
@@ -18756,11 +20036,18 @@ class SystemView(tk.Frame):
         outer, card = ui_card(self.body, app)
         outer.pack(fill="x", pady=(0, px(10)))
         opened = sysm.duties_open()
-        self._h2(card, f"Наряды вне очереди: {len(opened)} из {DUTY_CAP}", bg=C.SURFACE)
-        ui_text(card, app, "Выдаются утром за вчерашний день: не засчитан — +1 час к норме ближайшего дня; без сводки — "
-                           f"письменный разбор от {WRITE_MIN} знаков; главный удар не доведён — довести за два дня. "
-                           f"Больше {DUTY_CAP} открытых не бывает: это сигнал не давить, а пересобрать нагрузку.").pack(
-            fill="x", pady=(0, px(6)))
+        head = self._h2(card, f"Наряды вне очереди: {len(opened)} из {sysm.rule('duty_cap')}", bg=C.SURFACE)
+        ttk.Button(head, text="Правила", command=self._edit_rules).pack(side="right")
+        if sysm.rule("duties_on"):
+            n_days = sysm.rule("duty_task_days") + 1
+            ui_text(card, app, f"Выдаются утром за вчерашний день: не засчитан — +{fmt_h(sysm.rule('duty_hours'))} ч к "
+                               f"норме ближайшего дня; без сводки — письменный разбор от {sysm.rule('write_min')} знаков; "
+                               f"главный удар не доведён — довести за {n_days} {plural(n_days, DAY_FORMS)}. Больше "
+                               f"{sysm.rule('duty_cap')} открытых не бывает: это сигнал не давить, а пересобрать "
+                               "нагрузку.").pack(fill="x", pady=(0, px(6)))
+        else:
+            ui_text(card, app, "Наряды выключены в правилах: провалы стоят только штрафов опыта.",
+                    fg=C.LONG).pack(fill="x", pady=(0, px(6)))
         if not opened:
             ui_text(card, app, "Открытых нарядов нет.", fg=C.BREAK).pack(fill="x")
         for duty in opened:
@@ -18793,14 +20080,15 @@ class SystemView(tk.Frame):
         outer.pack(fill="x", pady=(0, px(10)))
         head = self._h2(card, "Перенос нормы", bg=C.SURFACE)
         now = PLATFORM["now"]()
-        cand = today if now >= at_time(today, CARRY_FROM) else today - timedelta(days=1)
+        cand = today if now >= at_time(today, sysm.rule("carry_from")) else today - timedelta(days=1)
         hours, why = sysm.carry_info(cand, now)
         if hours > 0:
             ttk.Button(head, text=f"Перенести до {fmt_h(hours)} ч", command=app.ask_carry).pack(side="right")
-        ui_text(card, app, f"До {fmt_h(CARRY_MAX_DAY)} ч недобора дня уходят поровну на два следующих дня с нормой. "
-                           f"Сегодняшний — после {CARRY_FROM}, вчерашний — до {RESERVE_DEADLINE}. Не чаще "
-                           f"{CARRY_MAX_WEEK} раз в неделю, общий долг — до {fmt_h(CARRY_MAX_DEBT)} ч.", fg=C.INK).pack(
-            fill="x")
+        ui_text(card, app, f"До {fmt_h(sysm.rule('carry_max_day'))} ч недобора дня уходят поровну на "
+                           f"{sysm.rule('carry_days')} следующих дня с нормой. Сегодняшний — после "
+                           f"{sysm.rule('carry_from')}, вчерашний — до {sysm.rule('reserve_deadline')}. Не чаще "
+                           f"{sysm.rule('carry_max_week')} раз в неделю, общий долг — до "
+                           f"{fmt_h(sysm.rule('carry_max_debt'))} ч.", fg=C.INK).pack(fill="x")
         ui_text(card, app, f"Долг сейчас: {fmt_h(sysm.carry_debt(today))} ч." + ("" if hours > 0 else f" Перенос с "
                                                                                     f"{cand:%d.%m}: {why}.")).pack(
             fill="x", pady=(px(4), 0))
@@ -18818,6 +20106,172 @@ class SystemView(tk.Frame):
             self.refresh()
         FormDialog(app, "Штрафы", fields, save, width=20,
                    note="Штрафы вычитаются из опыта. 0 — отключить. Чем строже, тем быстрее падает звание.")
+
+    # ───────── Личное дело ─────────
+    def _tab_dossier(self):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        today = app.today()
+        r = sysm.rank(today)
+        cols = tk.Frame(self.body, bg=C.BG)
+        cols.pack(fill="x", pady=(0, px(10)))
+        cols.columnconfigure(0, weight=1, uniform="ld")
+        cols.columnconfigure(1, weight=1, uniform="ld")
+        outer, card = ui_card(cols, app)
+        outer.grid(row=0, column=0, sticky="nsew", padx=(0, px(8)))
+        tk.Label(card, text="ЗВАНИЕ", font=F["tiny"], bg=C.SURFACE, fg=C.MUTED, anchor="w").pack(fill="x")
+        tk.Label(card, text=f"★ {r['name']}", font=F["h1"], bg=C.SURFACE, fg=C.INK, anchor="w").pack(fill="x")
+        Bar(card, app, (r["xp"] - r["lo"]) / max(1, r["hi"] - r["lo"]), C.BRASS).pack(fill="x", pady=(px(4), px(6)))
+        ui_text(card, app, f"Опыт {r['xp']}: за кампанию {r['gross']}" + (f", выслуга {r['carry']}" if r["carry"] else "")
+                + f", штрафы −{r['pen']}.", fg=C.INK).pack(fill="x")
+        for i in range(max(0, r["idx"] - 1), min(len(RANKS), r["idx"] + 4)):
+            need = 50 * i ** 2
+            mark = "▶ " if i == r["idx"] else "   "
+            fg = C.INK if i == r["idx"] else (C.MUTED if i < r["idx"] else C.FOCUS)
+            ui_text(card, app, f"{mark}{RANKS[i]} — от {need} опыта" + (f" (ещё {need - r['xp']})" if i > r["idx"] else ""),
+                    fg=fg).pack(fill="x")
+        ui_text(card, app, "Выслуга — опыт прошлых кампаний: со сменой кампании звание не сбрасывается.").pack(
+            fill="x", pady=(px(4), 0))
+
+        outer, card = ui_card(cols, app)
+        outer.grid(row=0, column=1, sticky="nsew")
+        tk.Label(card, text="НАГРАДЫ", font=F["tiny"], bg=C.SURFACE, fg=C.MUTED, anchor="w").pack(fill="x")
+        got = [x for x in sysm.s["rewards"] if x.get("got")]
+        wait = [x for x in sysm.s["rewards"] if not x.get("got") and x.get("target")]
+        if not got:
+            ui_text(card, app, "Наград пока нет — ближайшие ниже.", fg=C.INK).pack(fill="x")
+        for x in got:
+            d = sys_date(x.get("got"))
+            ui_text(card, app, f"★ {x.get('title')}" + (f" — {d:%d.%m.%Y}" if d else "")
+                    + (f" · {x['prize']}" if x.get("prize") else ""), fg=C.INK).pack(fill="x")
+        prog = sorted(((sysm.reward_value(x.get("kind"), today) / float(x.get("target") or 1), x) for x in wait),
+                      key=lambda t: -t[0])
+        for frac, x in prog[:4]:
+            ui_text(card, app, f"{x.get('title')}: {int(min(1.0, frac) * 100)}% — {fmt_h(x.get('target'))} "
+                               f"{REWARD_KINDS.get(x.get('kind'), '')}").pack(fill="x", pady=(px(3), 0))
+            Bar(card, app, frac, C.BRASS, height=5).pack(fill="x")
+
+        # рекорды
+        outer, card = ui_card(self.body, app)
+        outer.pack(fill="x", pady=(0, px(10)))
+        tk.Label(card, text="РЕКОРДЫ", font=F["tiny"], bg=C.SURFACE, fg=C.MUTED, anchor="w").pack(fill="x")
+        skip = set(sysm.s.get("no_count") or [])
+        by_day, pomos = defaultdict(float), 0
+        for x in app.store.sessions:
+            pomos += int(x.get("pomos", 0) or 0)
+            if (x.get("project") or "") in skip:
+                continue
+            try:
+                by_day[x.get("day", "")] += float(x.get("minutes", 0) or 0) / 60
+            except (TypeError, ValueError):
+                pass
+        by_week = defaultdict(float)
+        for k, v in by_day.items():
+            d = sys_date(k)
+            if d:
+                by_week[week_monday(d)] += v
+        best_day = max(by_day.items(), key=lambda kv: kv[1], default=None)
+        best_week = max(by_week.items(), key=lambda kv: kv[1], default=None)
+        a, b = sysm.start(), min(today, sysm.end())
+        rows = [
+            ("Всего сфокусированных часов", f"{fmt_h(sum(by_day.values()))} ч, штурмов {pomos}"),
+            ("Лучший день", f"{fmt_h(best_day[1])} ч — {sys_date(best_day[0]):%d.%m.%Y}" if best_day and sys_date(best_day[0])
+             else "—"),
+            ("Лучшая неделя", f"{fmt_h(best_week[1])} ч — с {best_week[0]:%d.%m.%Y}" if best_week else "—"),
+        ]
+        if b >= a:
+            rows += [("Серия засчитанных дней", f"лучшая {sysm.best_streak(sysm.good_day, a, b)}, сейчас "
+                                                f"{sysm.streak(sysm.good_day, today)}"),
+                     ("Сводок подряд", f"лучшая {sysm.best_streak(lambda d: bool(sysm.day(d).get('done')), a, b)}")]
+        held = sum(1 for u in sysm.urges() if u.get("result") == "held")
+        if sysm.urges():
+            rows.append(("ПВО", f"сбито соблазнов {held}, без срыва сейчас {days_word(sysm.urge_clean_days(today))}"))
+        fit_rows, avg = sysm.fit_summary()
+        if avg is not None:
+            rows.append(("Физподготовка", f"оценка «{FIT_GRADES[int(round(avg))]}» ({fmt_num(avg)} из 3)"))
+        if sysm.money_since():
+            rows.append(("Казна", f"без трат подряд {days_word(sysm.nospend_streak(today))}, сэкономлено отказами "
+                                  f"{fmt_money(sysm.money_saved(), sysm.money_cur())}"))
+        grid = tk.Frame(card, bg=C.SURFACE)
+        grid.pack(fill="x", pady=(px(4), 0))
+        grid.columnconfigure(1, weight=1)
+        for i, (k, v) in enumerate(rows):
+            tk.Label(grid, text=k, font=F["small"], bg=C.SURFACE, fg=C.MUTED, anchor="w").grid(
+                row=i, column=0, sticky="w", padx=(0, px(14)), pady=px(1))
+            tk.Label(grid, text=v, font=F["small_bold"], bg=C.SURFACE, fg=C.INK, anchor="w").grid(
+                row=i, column=1, sticky="w")
+
+        # поощрения и взыскания
+        outer, card = ui_card(self.body, app)
+        outer.pack(fill="x", pady=(0, px(10)))
+        tk.Label(card, text="ВЗЫСКАНИЯ И ПООЩРЕНИЯ ЗА КАМПАНИЮ", font=F["tiny"], bg=C.SURFACE, fg=C.MUTED,
+                 anchor="w").pack(fill="x")
+        duties = sysm.duties()
+        pens = sysm.penalties(today)
+        by_kind = defaultdict(lambda: [0, 0])
+        for _d, p, t in pens:
+            key = t.split(":")[0]
+            by_kind[key][0] += 1
+            by_kind[key][1] += p
+        ui_text(card, app, f"Нарядов: выполнено {sum(1 for x in duties if x.get('status') == 'done')}, провалено "
+                           f"{sum(1 for x in duties if x.get('status') == 'failed')}, открыто {len(sysm.duties_open())}. "
+                           f"Резерв: использовано {len(sysm.reserve_cfg()['used'])} из {sysm.reserve_total(today)}. "
+                           f"Засчитано дней: {sysm.good_days(today)}.", fg=C.INK).pack(fill="x")
+        if pens:
+            ui_text(card, app, "Штрафы: " + "; ".join(f"{k} ×{n} (−{p})" for k, (n, p) in
+                                                      sorted(by_kind.items(), key=lambda kv: -kv[1][1])),
+                    fg=C.DANGER).pack(fill="x", pady=(px(2), 0))
+        else:
+            ui_text(card, app, "Штрафов нет.", fg=C.BREAK).pack(fill="x", pady=(px(2), 0))
+
+        # послужной список
+        tk.Label(self.body, text="Послужной список", font=F["h2"], bg=C.BG, fg=C.INK).pack(anchor="w",
+                                                                                           pady=(px(4), px(4)))
+        frame = tk.Frame(self.body, bg=C.LINE, padx=1, pady=1)
+        frame.pack(fill="x")
+        camps = list(sysm.s.get("campaigns") or [])
+        cur = sysm.campaign_summary(today)
+        cur["closed"] = None
+        tcols = [("name", "Кампания", 150, True), ("dates", "Даты", 150, False), ("hours", "Часы / цель", 110, False),
+                 ("good", "Засчитано", 90, False), ("rank", "Звание", 140, False), ("pen", "Штрафы", 70, False),
+                 ("state", "", 90, False)]
+        tree = ttk.Treeview(frame, columns=[c[0] for c in tcols], show="headings", selectmode="browse",
+                            height=len(camps) + 1)
+        for key, text, w, stretch in tcols:
+            tree.heading(key, text=text, anchor="w")
+            tree.column(key, width=px(w), minwidth=px(40), anchor="w", stretch=stretch)
+        tree.pack(fill="x")
+        for i, c in enumerate(camps + [cur]):
+            a, b = sys_date(c.get("start")), sys_date(c.get("end"))
+            tree.insert("", "end", iid=str(i), values=(
+                c.get("name"), f"{a:%d.%m.%y}–{b:%d.%m.%y}" if a and b else "",
+                f"{fmt_h(c.get('hours'))} / {fmt_h(c.get('goal_hours'))}",
+                f"{c.get('good_days', 0)} из {c.get('days', 0)}", c.get("rank", ""), f"−{c.get('penalty', 0)}",
+                "идёт" if c.get("closed") is None else f"сдана {sys_date(c['closed']):%d.%m}"))
+        tree.bind("<Double-1>", lambda e: self._campaign_card(tree, camps + [cur]))
+        row = tk.Frame(self.body, bg=C.BG)
+        row.pack(fill="x", pady=(px(4), 0))
+        ui_link(row, app, "итоговый разбор текущей", lambda: app.final_review()).pack(side="right")
+        ui_text(row, app, "Двойной клик — итоги и разбор кампании.").pack(side="left")
+
+    def _campaign_card(self, tree, rows):
+        sel = tree.selection()
+        if not sel:
+            return
+        c = rows[int(sel[0])]
+        rev = c.get("review") or {}
+        lines = [f"{c.get('name')}: {c.get('start')} — {c.get('end')}",
+                 f"Часы {fmt_h(c.get('hours'))} из {fmt_h(c.get('goal_hours'))}, по норме {fmt_h(c.get('plan_hours'))}",
+                 f"Засчитано {c.get('good_days')} из {c.get('days')}, лучшая серия {c.get('best_streak')}, "
+                 f"сводок {c.get('checkins')}, тренировок {c.get('trainings')}",
+                 f"Звание {c.get('rank')}, опыт {c.get('xp')}, штрафы −{c.get('penalty')}",
+                 f"Наряды: выполнено {c.get('duties_done')}, провалено {c.get('duties_failed')}; резерв "
+                 f"{c.get('reserve_used')}"]
+        for key, label in (("plan", "Что планировали"), ("fact", "Что вышло"), ("why", "Почему разошлось"),
+                           ("keep", "Что сохранить"), ("change", "Что меняю")):
+            if rev.get(key):
+                lines.append(f"\n{label}: {rev[key]}")
+        messagebox.showinfo(APP_NAME, "\n".join(lines), parent=self.app)
 
     # ───────── Дневник ─────────
     def _weeks(self):
@@ -19182,19 +20636,59 @@ class SystemView(tk.Frame):
         outer, card = ui_card(self.body, app)
         outer.pack(fill="x", pady=(0, px(10)))
         head = self._h2(card, f"Задачи кампании", bg=C.SURFACE)
-        ttk.Button(head, text="Задачи и параметры", command=self._edit_goals).pack(side="right")
+        ttk.Button(head, text="Новая кампания", command=app.new_campaign).pack(side="right")
+        ttk.Button(head, text="Задачи и параметры", command=self._edit_goals).pack(side="right", padx=(0, px(6)))
         plan_all = sysm.plan_between(sysm.start(), sysm.end())
         lines = [
-            f"{CAMPAIGN}: {sysm.start():%d.%m.%Y} – {sysm.end():%d.%m.%Y}, {sysm.total_days()} "
+            f"{sysm.name()}: {sysm.start():%d.%m.%Y} – {sysm.end():%d.%m.%Y}, {sysm.total_days()} "
             f"{plural(sysm.total_days(), DAY_FORMS)}.",
             f"Часы: цель {fmt_h(g.get('hours'))}, по режимам дней выходит {fmt_h(plan_all)} "
             f"(шаблон недели {fmt_h(template)} ч). Резерв Ставки: {sysm.reserve_cfg().get('base')} дней.",
             f"Касания: {fmt_h(g.get('touches'))}. Тренировок в неделю: {fmt_h(g.get('trainings'))}. "
-            f"Сон от {fmt_h(g.get('sleep'))} ч, подъём {g.get('wake')}. Питание от {fmt_h(g.get('food'))} из 5.",
+            f"Сон от {fmt_h(g.get('sleep'))} ч, подъём {g.get('wake')}. Питание от {fmt_h(g.get('food'))} "
+            f"из {len(sysm.food_rules())}.",
             f"Оценки: не ниже {fmt_h(g.get('grade_min'))}, в среднем {fmt_h(g.get('grade_avg'))}. "
             f"Напоминание о вечерней сводке в {int(sysm.s.get('checkin_hour') or 21)}:00.",
         ]
         for line in lines:
+            ui_text(card, app, line, fg=C.INK).pack(fill="x")
+        today = app.today()
+        left = sysm.days_to_finish(today)
+        nxt = sysm.s.get("next_campaign") or {}
+        if nxt:
+            row = tk.Frame(card, bg=C.SURFACE)
+            row.pack(fill="x", pady=(px(4), 0))
+            ui_link(row, app, "отменить", app.cancel_next_campaign, fg=C.MUTED).pack(side="right")
+            ui_link(row, app, "изменить", app.new_campaign).pack(side="right", padx=px(8))
+            ui_text(row, app, f"Следующая: «{nxt.get('name')}» {sys_date(nxt['start']):%d.%m.%Y}–"
+                              f"{sys_date(nxt['end']):%d.%m.%Y}, цель {fmt_h(nxt.get('hours'))} ч — развернётся сама.",
+                    fg=C.BREAK).pack(side="left", fill="x", expand=True)
+        elif today > sysm.end() or left <= 7:
+            ui_text(card, app, ("Кампания завершена" if today > sysm.end() else f"До финиша {days_word(left)}")
+                    + ": итоговый разбор и новая кампания — кнопка «Новая кампания». Итоги уйдут в послужной список, "
+                    "опыт — в выслугу.", fg=C.LONG).pack(fill="x", pady=(px(4), 0))
+
+        outer, card = ui_card(self.body, app)
+        outer.pack(fill="x", pady=(0, px(10)))
+        head = self._h2(card, "Правила дисциплины", bg=C.SURFACE)
+        ttk.Button(head, text="Изменить правила", command=self._edit_rules).pack(side="right")
+        rl = sysm.rule
+        good = int(sysm.coach.get("good_score", 70) or 70)
+        rows = [
+            f"День засчитан от боеготовности {good}; по часам выполнен от {rl('met_share')}% нормы. Подъём вовремя — "
+            f"цель +{rl('wake_slack')} мин, штраф — позже чем на {rl('wake_penalty')} мин.",
+            ("Наряды: " + (f"до {rl('duty_cap')} открытых, за незасчитанный день +{fmt_h(rl('duty_hours'))} ч, "
+                           f"разбор от {rl('write_min')} знаков, главный удар — довести за "
+                           f"{rl('duty_task_days') + 1} дн." if rl("duties_on") else "выключены.")),
+            f"Резерв: {sysm.reserve_cfg().get('base')} дней, +1 за каждые {rl('reserve_earn_streak')} засчитанных "
+            f"подряд (до +{rl('reserve_earn_cap')}), на сегодня — до {rl('reserve_deadline')}. Режим с меньшей "
+            f"нормой — до {rl('downgrade_until')}. Бесплатных оборон за 7 дней: {rl('defense_free')}.",
+            ("Перенос: " + (f"до {fmt_h(rl('carry_max_day'))} ч на {rl('carry_days')} дн., не чаще "
+                            f"{rl('carry_max_week')} в неделю, долг до {fmt_h(rl('carry_max_debt'))} ч, сегодняшний — "
+                            f"после {rl('carry_from')}." if rl("carry_on") else "выключен.")),
+            "План подготовки к рубежу: " + ", ".join(f"Д-{off}" for off, _t in backplan_steps(sysm.rules())) + ".",
+        ]
+        for line in rows:
             ui_text(card, app, line, fg=C.INK).pack(fill="x")
 
         tk.Label(self.body, text="Этапы", font=F["h2"], bg=C.BG, fg=C.INK).pack(anchor="w", pady=(px(4), px(4)))
@@ -19278,18 +20772,113 @@ class SystemView(tk.Frame):
         ui_text(trow, app, "Двойной клик — норма и описание. Какой режим у какого дня недели — в «Задачах и параметрах», "
                            "расписание блоков — во вкладке «Дежурный».").pack(side="left", fill="x", expand=True)
 
-        tk.Label(self.body, text="Устав", font=F["h2"], bg=C.BG, fg=C.INK).pack(anchor="w", pady=(px(14), px(4)))
-        lines = SYS_RULES.splitlines()
+        urow = tk.Frame(self.body, bg=C.BG)
+        urow.pack(fill="x", pady=(px(14), px(4)))
+        tk.Label(urow, text="Устав", font=F["h2"], bg=C.BG, fg=C.INK).pack(side="left")
+        ui_link(urow, app, "изменить текст", self._edit_rules_text).pack(side="right", pady=(px(4), 0))
+        rules_text = sysm.rules_text()
+        lines = rules_text.splitlines()
         text = tk.Text(self.body, font=F["ui"], bg=C.SURFACE, fg=C.INK, relief="flat", wrap="word",
                        highlightthickness=1, highlightbackground=C.LINE, padx=px(14), pady=px(10),
                        height=len(lines) + 2)
-        text.insert("1.0", SYS_RULES)
+        text.insert("1.0", rules_text)
         for i, line in enumerate(lines, 1):
             if line and line == line.upper() and not line.startswith(("•", " ")):
                 text.tag_add("h", f"{i}.0", f"{i}.end")
         text.tag_configure("h", font=F["ui_bold"], foreground=C.FOCUS, spacing1=px(8))
         text.configure(state="disabled")
         text.pack(fill="x", pady=(0, px(10)))
+
+    def _edit_rules(self):
+        app, sysm = self.app, self.app.system
+        groups = [("Засчитан ли день", ["met_share", "wake_slack", "wake_penalty"]),
+                  ("Наряды вне очереди", ["duties_on", "duty_cap", "duty_hours", "duty_task_days", "write_min"]),
+                  ("Резерв Ставки и режимы", ["reserve_earn_streak", "reserve_earn_cap", "reserve_deadline",
+                                              "downgrade_until", "defense_free"]),
+                  ("Перенос нормы", ["carry_on", "carry_from", "carry_max_day", "carry_max_week", "carry_max_debt",
+                                     "carry_days"]),
+                  ("Построение и сводка", ["morning_required", "result_required"])]
+        fields = []
+        for title, keys in groups:
+            fields.append({"kind": "section", "label": title})
+            if title == "Засчитан ли день":
+                fields.append({"key": "good_score", "label": "Засчитан от боеготовности", "kind": "int",
+                               "value": int(sysm.coach.get("good_score", 70) or 70), "lo": 30, "hi": 100})
+            if title == "Резерв Ставки и режимы":
+                fields.append({"key": "reserve_base", "label": "Резерв на кампанию, дней", "kind": "int",
+                               "value": sysm.reserve_cfg().get("base"), "lo": 0, "hi": 60})
+            for k in keys:
+                d = RULE_DEFAULTS[k]
+                lo, hi = RULE_LIMITS.get(k, (0, 100))
+                if isinstance(d, bool):
+                    fields.append({"key": k, "label": RULE_LABELS[k], "kind": "check", "value": sysm.rule(k)})
+                elif isinstance(d, str):
+                    fields.append({"key": k, "label": RULE_LABELS[k], "kind": "time", "value": sysm.rule(k)})
+                else:
+                    fields.append({"key": k, "label": RULE_LABELS[k], "kind": "int" if isinstance(d, int) else "float",
+                                   "value": sysm.rule(k), "lo": lo, "hi": hi,
+                                   "step": 1 if isinstance(d, int) else 0.25})
+        steps = "\n".join(f"{off} {text}" for off, text in backplan_steps(sysm.rules()))
+        fields.append({"kind": "section", "label": "План подготовки к рубежу"})
+        fields.append({"key": "backplan", "label": "Шаги", "kind": "text", "value": steps, "height": 6,
+                       "hint": "строка — за сколько дней до рубежа и что делать: «7 разведка: материалы и темы»"})
+
+        def save(v):
+            plan = []
+            for line in v["backplan"].splitlines():
+                head, _sp, text = line.strip().partition(" ")
+                if not line.strip():
+                    continue
+                try:
+                    off = int(head.lstrip("Дд-"))
+                except ValueError:
+                    messagebox.showwarning(APP_NAME, f"План подготовки: не понял строку «{line}». Нужно «7 что делать».",
+                                           parent=app)
+                    return False
+                if not 1 <= off <= 60 or not text.strip():
+                    messagebox.showwarning(APP_NAME, f"План подготовки: «{line}» — от 1 до 60 дней и текст.", parent=app)
+                    return False
+                plan.append([off, text.strip()])
+            rules = sysm.rules()
+            for k in RULE_DEFAULTS:
+                if k in v and v[k] is not None:
+                    rules[k] = v[k]
+            rules["backplan"] = plan
+            sysm.coach["good_score"] = v["good_score"]
+            sysm.reserve_cfg()["base"] = v["reserve_base"]
+            sysm.journal_add("campaign", "правила дисциплины изменены")
+            app._sys_changed("Правила приняты")
+
+        def reset(dlg):
+            if not messagebox.askyesno(APP_NAME, "Вернуть все правила к стандартным? Штрафы и резерв не трогаются.",
+                                       parent=dlg):
+                return
+            sysm.s["rules"] = {}
+            sysm.coach["good_score"] = 70
+            sysm.journal_add("campaign", "правила дисциплины — стандартные")
+            app._sys_changed("Правила стандартные")
+            dlg.destroy()
+        FormDialog(app, "Правила дисциплины", fields, save, width=34, scroll=True,
+                   extra_buttons=[("Стандартные", reset)],
+                   note="Правила Устава. Строже — быстрее растёшь и быстрее падаешь. Мягче — меньше нарядов, "
+                        "но и серия значит меньше. Меняются заранее, а не в день провала.")
+
+    def _edit_rules_text(self):
+        app, sysm = self.app, self.app.system
+
+        def save(v):
+            text = v["text"].strip()
+            sysm.s["rules_text"] = "" if text == SYS_RULES.strip() else text
+            app._sys_changed("Устав сохранён")
+
+        def reset(dlg):
+            sysm.s["rules_text"] = ""
+            app._sys_changed("Устав — стандартный текст")
+            dlg.destroy()
+        FormDialog(app, "Устав", [
+            {"key": "text", "label": "Текст", "kind": "text", "value": sysm.rules_text(), "height": 24, "width": 90,
+             "hint": "строка ЗАГЛАВНЫМИ — заголовок раздела. Правила с цифрами меняются в «Изменить правила»"}],
+            save, extra_buttons=[("Стандартный текст", reset)])
 
     def _edit_goals(self):
         app, sysm = self.app, self.app.system
@@ -19298,6 +20887,7 @@ class SystemView(tk.Frame):
         plan_text = "\n".join(f"{date.fromisoformat(k):%d.%m.%Y} {v}" for k, v in sorted(sysm.s["touch_plan"].items())
                               if sys_date(k))
         fields = [
+            {"key": "name", "label": "Название кампании", "value": sysm.name(), "required": True},
             {"key": "start", "label": "Старт", "kind": "date", "value": sysm.s["start"], "required": True},
             {"key": "end", "label": "Финиш", "kind": "date", "value": sysm.s["end"], "required": True},
             {"key": "hours", "label": "Часов за кампанию", "kind": "int", "value": g.get("hours"), "lo": 1, "hi": 5000},
@@ -19308,7 +20898,8 @@ class SystemView(tk.Frame):
             {"key": "sleep", "label": "Сон от, часов", "kind": "float", "value": g.get("sleep"), "lo": 4, "hi": 12,
              "step": 0.5},
             {"key": "wake", "label": "Подъём", "kind": "time", "value": g.get("wake")},
-            {"key": "food", "label": "Питание от, из 5", "kind": "int", "value": g.get("food"), "lo": 0, "hi": 5},
+            {"key": "food", "label": f"Питание от, из {len(sysm.food_rules())}", "kind": "int", "value": g.get("food"),
+             "lo": 0, "hi": len(sysm.food_rules())},
             {"key": "grade_min", "label": "Оценка не ниже", "kind": "int", "value": g.get("grade_min"), "lo": 4,
              "hi": 10},
             {"key": "grade_avg", "label": "Средняя оценка", "kind": "float", "value": g.get("grade_avg"), "lo": 4,
@@ -19349,6 +20940,7 @@ class SystemView(tk.Frame):
                 if d:
                     plan[week_monday(d).isoformat()] = max(0, n)
             sysm.s["start"], sysm.s["end"] = st.isoformat(), en.isoformat()
+            sysm.s["name"] = v["name"].strip() or CAMPAIGN
             for key in ("hours", "touches", "trainings", "sleep", "food", "grade_min", "grade_avg"):
                 g[key] = v[key]
             g["wake"] = v["wake"] or g.get("wake")
@@ -19546,7 +21138,8 @@ class SystemView(tk.Frame):
         cs = sysm.streak(lambda d: bool(sysm.day(d).get("done")), today)
         self._kpi(grid, 1, "Засчитано подряд", f"{gs} {plural(gs, DAY_FORMS)}",
                   [(f"засчитан — боеготовность от {good}", None), (f"сводок подряд: {cs}", None),
-                   (f"засчитано всего: {sysm.good_days(today)}; резерв +1 за каждые {RESERVE_EARN_STREAK}", None)])
+                   (f"засчитано всего: {sysm.good_days(today)}; резерв +1 за каждые "
+                    f"{sysm.rule('reserve_earn_streak')}", None)])
         rewards = [(sysm.reward_value(r.get("kind"), today) / float(r.get("target") or 1), r)
                    for r in sysm.s["rewards"] if not r.get("got") and r.get("target")]
         if rewards:
@@ -20082,20 +21675,25 @@ class SystemView(tk.Frame):
         w = sysm.coach.setdefault("weights", {})
         names = [("hours", "Часы к норме"), ("checkin", "Сводка"), ("train", "Тренировка"), ("sleep", "Сон"),
                  ("food", "Питание"), ("wake", "Подъём вовремя"), ("mit", "Главный удар"), ("cards", "Карточки"),
-                 ("touches", "Касания")]
+                 ("touches", "Касания"), ("lists", "Боевые листы")]
         fields = [{"key": k, "label": f"{t}, вес", "kind": "int", "value": w.get(k, 0), "lo": 0, "hi": 100}
                   for k, t in names]
         fields.append({"key": "good", "label": "День засчитан от", "kind": "int",
                        "value": sysm.coach.get("good_score", 70), "lo": 1, "hi": 100})
 
         def save(v):
+            if v["lists"] and not w.get("lists"):
+                # листы начинают считаться с сегодняшнего дня: прошлые дни задним числом не проваливаются
+                sysm.coach["lists_since"] = app.today().isoformat()
             for k, _t in names:
                 w[k] = v[k]
             sysm.coach["good_score"] = v["good"]
+            sysm.invalidate()
             app.store.save()
             self.refresh()
         FormDialog(app, "Боеготовность", fields, save, width=20,
-                   note="Веса относительные: индекс = взвешенная доля выполненного, от 0 до 100.")
+                   note="Веса относительные: индекс = взвешенная доля выполненного, от 0 до 100. Боевые листы "
+                        "считаются с того дня, когда им дали вес: прошлые дни задним числом не меняются.")
 
     def _edit_motivation(self):
         app, sysm = self.app, self.app.system
@@ -20677,9 +22275,1006 @@ class ContactsView(tk.Frame):
 
 # ───────────────────────── приложение ─────────────────────────
 
+# ───────────────────────── 10.0: Дисциплина, Физподготовка, Казна ─────────────────────────
+
+URGE_FORMS = ("перехват", "перехвата", "перехватов")
+WD_GROUPS = {"каждый день": list(range(7)), "ежедневно": list(range(7)), "будни": [0, 1, 2, 3, 4],
+             "выходные": [5, 6]}
+
+
+def fmt_weekdays(days):
+    days = sorted(set(days or []))
+    if days == list(range(7)):
+        return "каждый день"
+    if days == [0, 1, 2, 3, 4]:
+        return "будни"
+    if days == [5, 6]:
+        return "выходные"
+    return ", ".join(WD_SHORT[d] for d in days) or "никогда"
+
+
+def parse_weekdays(text):
+    """«пн, ср, пт», «пн-пт», «будни», «каждый день» → [0, 2, 4]. Ошибка — ValueError."""
+    t = (text or "").strip().lower()
+    if not t:
+        return list(range(7))
+    if t in WD_GROUPS:
+        return list(WD_GROUPS[t])
+    out = set()
+    for part in re.split(r"[,;\s]+", t):
+        if not part:
+            continue
+        m = re.fullmatch(r"([а-яa-z]+)\s*[-–—]\s*([а-яa-z]+)", part)
+        if m and m[1] in WEEKDAYS and m[2] in WEEKDAYS:
+            a, b = WEEKDAYS[m[1]], WEEKDAYS[m[2]]
+            out.update(range(a, b + 1) if a <= b else list(range(a, 7)) + list(range(0, b + 1)))
+        elif part in WEEKDAYS:
+            out.add(WEEKDAYS[part])
+        elif part in WD_GROUPS:
+            out.update(WD_GROUPS[part])
+        else:
+            raise ValueError(f"не понял «{part}»")
+    return sorted(out)
+
+
+def kpi_card(grid, app, col, title, big, lines, frac=None, mark=None, color=None, big_font="stat", big_fg=None):
+    F, px = app.fonts, app.px
+    outer, card = ui_card(grid, app, padx=12, pady=10)
+    outer.grid(row=0, column=col, sticky="nsew", padx=(0 if col == 0 else px(8), 0))
+    grid.columnconfigure(col, weight=1, uniform="kpi")
+    tk.Label(card, text=title.upper(), font=F["tiny"], bg=C.SURFACE, fg=C.MUTED, anchor="w").pack(fill="x")
+    tk.Label(card, text=big, font=F[big_font], bg=C.SURFACE, fg=big_fg or C.INK, anchor="w", justify="left",
+             wraplength=px(220)).pack(fill="x")
+    if frac is not None:
+        Bar(card, app, frac, color or C.FOCUS, mark).pack(fill="x", pady=(px(4), px(6)))
+    for text, fg in lines:
+        ui_text(card, app, text, fg=fg or C.MUTED).pack(fill="x")
+    return card
+
+
+class KitView(tk.Frame):
+    """Каркас разделов 10.0: заголовок, подсказка, вкладки и прокручиваемое тело, которое перестраивается целиком."""
+    TITLE = ""
+    HINT = ""
+    TABS = []
+    SETTING = ""
+
+    def __init__(self, master, app):
+        super().__init__(master, bg=C.BG)
+        self.app = app
+        F, px = app.fonts, app.px
+        tab = app.store.settings.get(self.SETTING) if self.SETTING else None
+        self.tab = tab if tab in dict(self.TABS) else (self.TABS[0][0] if self.TABS else None)
+        wrap = tk.Frame(self, bg=C.BG)
+        wrap.pack(fill="both", expand=True, padx=px(28), pady=(px(22), px(8)))
+        self.head = tk.Frame(wrap, bg=C.BG)
+        self.head.pack(fill="x")
+        tk.Label(self.head, text=self.TITLE, font=F["h1"], bg=C.BG, fg=C.INK).pack(side="left")
+        self.sub = tk.Label(self.head, text="", font=F["ui"], bg=C.BG, fg=C.MUTED)
+        self.sub.pack(side="left", padx=(px(14), 0), pady=(px(6), 0))
+        self.buttons(self.head)
+        if self.HINT:
+            ui_text(wrap, app, self.HINT).pack(fill="x", pady=(px(4), px(8)))
+        self.seg = None
+        if self.TABS:
+            self.seg = Segmented(wrap, app, self.TABS, self.set_tab)
+            self.seg.pack(anchor="w", pady=(0, px(10)))
+        self.scroll = ScrollFrame(wrap)
+        self.scroll.pack(fill="both", expand=True)
+        self.body = self.scroll.inner
+
+    def buttons(self, head):
+        pass
+
+    def set_tab(self, key):
+        self.tab = key
+        if self.SETTING:
+            self.app.store.settings[self.SETTING] = key
+        if self.app.current_view != self.KEY:
+            self.app._goto(self.KEY)
+        else:
+            self.refresh()
+        self.scroll.canvas.yview_moveto(0)
+
+    def on_show(self):
+        self.refresh()
+        self.focus_set()
+
+    def refresh(self):
+        for w in self.body.winfo_children():
+            w.destroy()
+        if self.seg is not None:
+            self.seg.set(self.tab, C.FOCUS)
+        self.render(self.app.today())
+
+    def render(self, today):
+        pass
+
+    def card(self, gap=10):
+        outer, card = ui_card(self.body, self.app)
+        outer.pack(fill="x", pady=(0, self.app.px(gap)))
+        return card
+
+    def h2(self, parent, text, link=None, command=None):
+        F, px = self.app.fonts, self.app.px
+        row = tk.Frame(parent, bg=parent.cget("bg"))
+        row.pack(fill="x", pady=(0, px(4)))
+        tk.Label(row, text=text, font=F["h2"], bg=row.cget("bg"), fg=C.INK).pack(side="left")
+        if link:
+            ui_link(row, self.app, link, command).pack(side="right", pady=(px(4), 0))
+        return row
+
+    def check(self, parent, text, value, command, fg=None):
+        F = self.app.fonts
+        bg = parent.cget("bg")
+        var = tk.BooleanVar(value=bool(value))
+        cb = tk.Checkbutton(parent, text=text, variable=var, bg=bg, fg=fg or C.INK, activebackground=bg,
+                            selectcolor=C.SURFACE, activeforeground=C.INK, font=F["ui"], anchor="w",
+                            highlightthickness=0, bd=0, command=lambda: command(var.get()))
+        return cb, var
+
+
+class DisciplineView(KitView):
+    KEY = "discipline"
+    TITLE = "Дисциплина"
+    HINT = ("ПВО — перехват соблазнов: тянет отвлечься — записал, выдержал 10 минут, отметил итог. Протоколы «если — "
+            "то» — решения, принятые заранее. Боевые листы — порядок без раздумий. Ctrl+U — перехват из любого раздела.")
+    TABS = [("pvo", "ПВО"), ("protocols", "Протоколы"), ("lists", "Боевые листы")]
+    SETTING = "discipline_tab"
+
+    def __init__(self, master, app):
+        self._timers = []
+        self.list_back = 0
+        super().__init__(master, app)
+
+    def buttons(self, head):
+        ttk.Button(head, text="Перехват  Ctrl+U", style="Work.TButton", command=self.app.open_urge).pack(side="right")
+
+    def render(self, today):
+        sysm = self.app.system
+        self._timers = []
+        st = sysm.urge_stats(today, today)
+        dl, nl, _m, _i = sysm.checks_day(today)
+        self.sub.configure(text=f"сегодня {st['n']} {plural(st['n'], URGE_FORMS)} · без срыва "
+                                f"{days_word(sysm.urge_clean_days(today))} · листов {dl} из {nl}")
+        getattr(self, "_tab_" + self.tab)(today)
+
+    def tick(self):
+        if not self._timers:
+            return
+        now = PLATFORM["now"]()
+        for lbl, until in self._timers:
+            try:
+                left = (until - now).total_seconds()
+                lbl.configure(text=f"держись: {fmt_clock(left)}" if left > 0 else "время вышло — итог?",
+                              fg=C.FOCUS if left > 0 else C.LONG)
+            except tk.TclError:
+                pass
+
+    # ───────── ПВО ─────────
+    def _tab_pvo(self, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        d0 = sysm.urge_stats(today, today)
+        w7 = sysm.urge_stats(today - timedelta(days=6), today)
+        m30 = sysm.urge_stats(today - timedelta(days=29), today)
+        grid = tk.Frame(self.body, bg=C.BG)
+        grid.pack(fill="x", pady=(0, px(10)))
+        kpi_card(grid, app, 0, "Сегодня", f"{d0['n']} {plural(d0['n'], URGE_FORMS)}",
+                 [(f"устоял {d0['held']} · сорвался {d0['fell']}" + (f" · без итога {d0['open']}" if d0["open"] else ""),
+                   None)])
+        rate = w7["rate"]
+        kpi_card(grid, app, 1, "Удержание за 7 дней", f"{int(round(rate * 100))}%" if rate is not None else "—",
+                 [(f"перехватов {w7['n']}: устоял {w7['held']}, сорвался {w7['fell']}", None)],
+                 frac=rate or 0.0, color=C.BREAK)
+        clean = sysm.urge_clean_days(today)
+        kpi_card(grid, app, 2, "Без срыва", days_word(clean),
+                 [("подряд, считая сегодня" if clean else "сорвался сегодня — завтра счёт заново", None)],
+                 big_fg=C.BREAK if clean >= 3 else None)
+        kpi_card(grid, app, 3, "За 30 дней", f"{m30['n']} {plural(m30['n'], URGE_FORMS)}",
+                 [(f"средняя сила {fmt_num(m30['power'])} из 5" if m30["power"] else "сила —", None),
+                  (f"во время штурма: {m30['focus']}", None)])
+
+        opened = sorted(sysm.urge_open(), key=lambda u: u["ts"])
+        if opened:
+            card = self.card()
+            self.h2(card, "На перехвате")
+            for u in opened[-8:]:
+                row = tk.Frame(card, bg=C.SURFACE)
+                row.pack(fill="x", pady=px(2))
+                ttk.Button(row, text="Сорвался", command=lambda uu=u: app.urge_result(uu, "fell")).pack(side="right")
+                ttk.Button(row, text="Устоял", style="Work.TButton",
+                           command=lambda uu=u: app.urge_result(uu, "held")).pack(side="right", padx=px(6))
+                lbl = tk.Label(row, text="", font=F["small"], bg=C.SURFACE, fg=C.MUTED)
+                lbl.pack(side="right", padx=px(8))
+                try:
+                    self._timers.append((lbl, datetime.fromisoformat(u["until"])))
+                except (KeyError, TypeError, ValueError):
+                    lbl.configure(text="итог не отмечен")
+                ts = datetime.fromisoformat(u["ts"])
+                tk.Label(row, text=f"{ts:%d.%m %H:%M} · {u.get('what')}", font=F["ui_bold"], bg=C.SURFACE,
+                         fg=C.INK).pack(side="left")
+                ui_text(row, app, f"  сила {u.get('power', '—')}" + (f" — {u['note']}" if u.get("note") else "")).pack(
+                    side="left", fill="x", expand=True)
+            protos = []
+            for u in opened:
+                for p in sysm.protocols(u.get("what")):
+                    if p not in protos:
+                        protos.append(p)
+            for p in protos[:2]:
+                ui_text(card, app, f"Протокол: если {lc_first(p['if'])} — {p['then']}", fg=C.FOCUS).pack(
+                    fill="x", pady=(px(4), 0))
+            self.tick()
+
+        card = self.card()
+        self.h2(card, "Откуда атакуют: 30 дней")
+        if not m30["kinds"]:
+            ui_text(card, app, "Перехватов пока нет. Тянет в ленту, на YouTube, за телефон или сладким — Ctrl+U: "
+                               "записать, что тянет, и выдержать 10 минут. Через неделю здесь будет видно, что и в "
+                               "какие часы атакует сильнее всего.", fg=C.INK).pack(fill="x")
+        else:
+            for kind, (n, held, fell) in m30["kinds"][:8]:
+                row = tk.Frame(card, bg=C.SURFACE)
+                row.pack(fill="x", pady=px(2))
+                tk.Label(row, text=kind, font=F["ui"], bg=C.SURFACE, fg=C.INK, width=22, anchor="w").pack(side="left")
+                tk.Label(row, text=f"{n}: устоял {held}, сорвался {fell}", font=F["small"], bg=C.SURFACE,
+                         fg=C.MUTED, width=24, anchor="e").pack(side="right")
+                Bar(row, app, held / n if n else 0.0, C.BREAK).pack(side="left", fill="x", expand=True, padx=px(8))
+            tk.Label(card, text="Когда атакует, по часам", font=F["small_bold"], bg=C.SURFACE, fg=C.MUTED,
+                     anchor="w").pack(fill="x", pady=(px(10), 0))
+            c = tk.Canvas(card, height=px(64), bg=C.SURFACE, highlightthickness=0)
+            c.pack(fill="x")
+            c.bind("<Configure>", lambda e, cc=c, h=m30["hours"]: self._draw_hours(cc, h))
+
+        card = self.card()
+        self.h2(card, "Журнал перехватов")
+        recent = sorted(sysm.urges(), key=lambda u: u["ts"])[-15:]
+        if not recent:
+            ui_text(card, app, "Пусто.").pack(fill="x")
+        for u in reversed(recent):
+            res = u.get("result")
+            color = C.BREAK if res == "held" else (C.DANGER if res == "fell" else C.MUTED)
+            row = tk.Frame(card, bg=C.SURFACE)
+            row.pack(fill="x", pady=px(1))
+            ui_link(row, app, "удалить", lambda uu=u: app.urge_delete(uu), fg=C.MUTED).pack(side="right")
+            if res:
+                ui_link(row, app, "сменить итог", lambda uu=u: app.urge_result(
+                    uu, "fell" if uu.get("result") == "held" else "held"), fg=C.MUTED).pack(side="right", padx=px(8))
+            try:
+                ts = f"{datetime.fromisoformat(u['ts']):%d.%m %H:%M}"
+            except (KeyError, ValueError):
+                ts = "—"
+            ui_text(row, app, f"{ts} · {u.get('what')} · сила {u.get('power', '—')} · "
+                              f"{URGE_RESULTS.get(res, 'без итога')}" + (f" — {u['note']}" if u.get("note") else ""),
+                    fg=color).pack(side="left", fill="x", expand=True)
+
+    def _draw_hours(self, c, hours):
+        px = self.app.px
+        c.delete("all")
+        w, h = c.winfo_width(), c.winfo_height()
+        if w < 100:
+            return
+        top = max(hours) or 1
+        step = w / 24
+        base = h - px(14)
+        for i, v in enumerate(hours):
+            x0 = i * step + 2
+            bh = (base - 4) * v / top
+            c.create_rectangle(x0, base - bh, x0 + step - 4, base, fill=C.DANGER if v == top and v else C.LONG,
+                               outline="")
+            if i % 3 == 0:
+                c.create_text(x0, h - 1, text=f"{i:02d}", anchor="sw", fill=C.MUTED, font=self.app.fonts["tiny"])
+
+    # ───────── протоколы ─────────
+    def _tab_protocols(self, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        card = self.card()
+        head = self.h2(card, "Протоколы «если — то»")
+        ttk.Button(head, text="Новый протокол", style="Work.TButton", command=lambda: app.edit_protocol(None)).pack(
+            side="right")
+        ui_text(card, app, "Решение, принятое до того, как прижало: «если X — то Y». В момент соблазна думать уже не "
+                           "нужно — протокол показывается в перехвате, а один из них — на построении. Привязка к "
+                           "соблазну: какой протокол показывать в ПВО.", fg=C.INK).pack(fill="x")
+        if not sysm.s["protocols"]:
+            ui_text(card, app, "Протоколов нет.").pack(fill="x", pady=(px(6), 0))
+        for p in sysm.s["protocols"]:
+            on = p.get("on", True)
+            card = self.card(6)
+            top = tk.Frame(card, bg=C.SURFACE)
+            top.pack(fill="x")
+            ui_link(top, app, "изменить", lambda pp=p: app.edit_protocol(pp)).pack(side="right")
+            tk.Label(top, text="ЕСЛИ", font=F["small_bold"], bg=C.SURFACE, fg=C.FOCUS if on else C.MUTED, width=5,
+                     anchor="w").pack(side="left", anchor="n")
+            ui_text(top, app, p.get("if", ""), font="ui_bold", fg=C.INK if on else C.MUTED).pack(
+                side="left", fill="x", expand=True)
+            row = tk.Frame(card, bg=C.SURFACE)
+            row.pack(fill="x", pady=(px(2), 0))
+            tk.Label(row, text="ТО", font=F["small_bold"], bg=C.SURFACE, fg=C.FOCUS if on else C.MUTED, width=5,
+                     anchor="w").pack(side="left", anchor="n")
+            ui_text(row, app, p.get("then", ""), font="ui", fg=C.INK if on else C.MUTED).pack(
+                side="left", fill="x", expand=True)
+            tags = ", ".join(p.get("urges") or [])
+            if tags or not on:
+                ui_text(card, app, ("выключен · " if not on else "") + (f"в ПВО: {tags}" if tags else "")).pack(
+                    fill="x", pady=(px(2), 0))
+
+    # ───────── боевые листы ─────────
+    def _tab_lists(self, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        d = today - timedelta(days=self.list_back)
+        dl, nl, marked, items = sysm.checks_day(d)
+        card = self.card()
+        head = self.h2(card, "Боевые листы")
+        ttk.Button(head, text="Новый лист", style="Work.TButton", command=lambda: app.edit_checklist(None)).pack(
+            side="right")
+        seg = Segmented(head, app, [(0, "Сегодня"), (1, "Вчера")], self._list_day)
+        seg.pack(side="right", padx=px(10))
+        seg.set(self.list_back, C.FOCUS)
+        ui_text(card, app, f"{WD_FULL[d.weekday()].capitalize()}, {d:%d.%m}: листов закрыто {dl} из {nl}, пунктов "
+                           f"{marked} из {items}. Закрытый лист — +5 опыта. «Утренний осмотр» — на построении, "
+                           "«Вечерняя поверка» — в сводке.", fg=C.INK).pack(fill="x")
+        due = sysm.checklists(d)
+        for c in due:
+            self._list_card(c, d, today)
+        rest = [c for c in sysm.s["checklists"] if c not in due]
+        if rest:
+            card = self.card()
+            tk.Label(card, text="Не на этот день или выключены", font=F["small_bold"], bg=C.SURFACE, fg=C.MUTED,
+                     anchor="w").pack(fill="x")
+            for c in rest:
+                row = tk.Frame(card, bg=C.SURFACE)
+                row.pack(fill="x", pady=px(1))
+                ui_link(row, app, "изменить", lambda cc=c: app.edit_checklist(cc)).pack(side="right")
+                ui_text(row, app, f"{c['title']} — {fmt_weekdays(c.get('days'))}"
+                                  + ("" if c.get("on", True) else ", выключен")
+                                  + ("" if c.get("items") else ", пунктов нет")).pack(side="left", fill="x", expand=True)
+
+    def _list_day(self, back):
+        self.list_back = back
+        self.refresh()
+
+    def _list_card(self, c, d, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        card = self.card(8)
+        top = tk.Frame(card, bg=C.SURFACE)
+        top.pack(fill="x")
+        ui_link(top, app, "изменить", lambda: app.edit_checklist(c)).pack(side="right")
+        tk.Label(top, text=c["title"], font=F["ui_bold"], bg=C.SURFACE, fg=C.INK).pack(side="left")
+        tk.Label(top, text=f"  {CHECK_WHEN.get(c.get('when'), '')} · {fmt_weekdays(c.get('days'))}", font=F["small"],
+                 bg=C.SURFACE, fg=C.MUTED).pack(side="left")
+        state = sysm.check_state(d, c["id"])
+        n = len(c["items"])
+        prog = tk.Label(top, text="", font=F["ui_bold"], bg=C.SURFACE)
+        prog.pack(side="right", padx=px(12))
+
+        def paint():
+            m = len(sysm.check_state(d, c["id"]) & set(range(n)))
+            streak = sysm.checks_streak(c["id"], today)
+            prog.configure(text=f"{m} из {n}" + (f" · серия {streak}" if streak else ""),
+                           fg=C.BREAK if m >= n else (C.FOCUS if m else C.MUTED))
+        paint()
+        box = tk.Frame(card, bg=C.SURFACE)
+        box.pack(fill="x", pady=(px(4), 0))
+        box.columnconfigure(0, weight=1, uniform="ck")
+        box.columnconfigure(1, weight=1, uniform="ck")
+        for i, item in enumerate(c["items"]):
+            def toggle(on, i=i):
+                app.check_toggle(d, c, i, on)
+                paint()
+            cb, _v = self.check(box, item, i in state, toggle)
+            cb.grid(row=i // 2, column=i % 2, sticky="w", pady=px(1))
+        grid = tk.Canvas(card, bg=C.SURFACE, highlightthickness=0, height=px(16))
+        grid.pack(fill="x", pady=(px(6), 0))
+        grid.bind("<Configure>", lambda e, g=grid: self._draw_list_grid(g, c, today))
+
+    def _draw_list_grid(self, canvas, c, today):
+        sysm = self.app.system
+        canvas.delete("all")
+        size, gap = self.app.px(12), self.app.px(3)
+        n = len(c["items"])
+        for i in range(28):
+            d = today - timedelta(days=27 - i)
+            x = i * (size + gap)
+            if d.weekday() not in (c.get("days") or range(7)):
+                fill = C.SOFT
+            else:
+                m = len(sysm.check_state(d, c["id"]) & set(range(n)))
+                fill = C.BREAK if n and m >= n else (C.FOCUS_SOFT if m else (C.TRACK if d == today else C.LINE))
+            canvas.create_rectangle(x, 1, x + size, 1 + size, fill=fill, outline=C.INK if d == today else "")
+
+
+class UrgeDialog(tk.Toplevel):
+    """Перехват: что тянет, сила, и решение — держу 10 минут, уже устоял или сорвался."""
+
+    def __init__(self, app):
+        ensure_visible(app)
+        super().__init__(app)
+        self.app = app
+        sysm = app.system
+        F, px = app.fonts, app.px
+        self.title("Перехват")
+        self.configure(bg=C.BG)
+        self.transient(app)
+        self.resizable(False, False)
+        try:
+            self.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        body = tk.Frame(self, bg=C.BG, padx=px(22), pady=px(18))
+        body.pack(fill="both", expand=True)
+        tk.Label(body, text="ПВО: перехват", font=F["h1"], bg=C.BG, fg=C.INK).pack(anchor="w")
+        tk.Label(body, text=f"Записать соблазн и выдержать {sysm.urge_hold()} минут. Желание — волна: она поднимается "
+                            "и спадает, если не кормить её действием.", font=F["small"], bg=C.BG, fg=C.MUTED,
+                 anchor="w", justify="left", wraplength=px(440)).pack(fill="x", pady=(px(2), px(10)))
+        form = tk.Frame(body, bg=C.BG)
+        form.pack(fill="x")
+        form.columnconfigure(1, weight=1)
+        tk.Label(form, text="Что тянет", font=F["ui"], bg=C.BG, fg=C.MUTED).grid(row=0, column=0, sticky="w",
+                                                                                   padx=(0, px(14)), pady=px(4))
+        last = next((u.get("what") for u in reversed(sysm.urges())), None)
+        self.what = tk.StringVar(value=last or URGE_KINDS[0])
+        cb = ttk.Combobox(form, textvariable=self.what, values=sysm.urge_kinds(), font=F["ui"], width=30)
+        cb.grid(row=0, column=1, sticky="we")
+        tk.Label(form, text="Сила", font=F["ui"], bg=C.BG, fg=C.MUTED).grid(row=1, column=0, sticky="w",
+                                                                              padx=(0, px(14)), pady=px(4))
+        prow = tk.Frame(form, bg=C.BG)
+        prow.grid(row=1, column=1, sticky="w")
+        self.power = 3
+        self.pseg = Segmented(prow, app, [(i, str(i)) for i in range(1, 6)], self._power)
+        self.pseg.pack(side="left")
+        tk.Label(prow, text="1 — фон, 5 — почти сорвался", font=F["small"], bg=C.BG, fg=C.MUTED).pack(
+            side="left", padx=px(10))
+        self._power(3)
+        tk.Label(form, text="Где и почему", font=F["ui"], bg=C.BG, fg=C.MUTED).grid(row=2, column=0, sticky="w",
+                                                                                      padx=(0, px(14)), pady=px(4))
+        self.note = tk.StringVar()
+        ttk.Entry(form, textvariable=self.note, font=F["ui"]).grid(row=2, column=1, sticky="we")
+        self.proto = tk.Label(body, text="", font=F["small"], bg=C.BG, fg=C.FOCUS, anchor="w", justify="left",
+                              wraplength=px(440))
+        self.proto.pack(fill="x", pady=(px(8), 0))
+        self.what.trace_add("write", lambda *_a: self._show_protocol())
+        self._show_protocol()
+        btns = tk.Frame(body, bg=C.BG)
+        btns.pack(fill="x", pady=(px(14), 0))
+        ttk.Button(btns, text=f"Держу {sysm.urge_hold()} минут", style="Work.TButton",
+                   command=lambda: self._save(None)).pack(side="left")
+        ttk.Button(btns, text="Уже устоял", command=lambda: self._save("held")).pack(side="left", padx=px(6))
+        ttk.Button(btns, text="Сорвался", command=lambda: self._save("fell")).pack(side="left")
+        ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right")
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.bind("<Return>", lambda e: self._save(None))
+        dialog_place(self, app, 90)
+        cb.focus_set()
+        dialog_grab(self)
+
+    def _power(self, value):
+        self.power = value
+        self.pseg.set(value, C.DANGER if value >= 4 else C.FOCUS)
+
+    def _show_protocol(self):
+        ps = self.app.system.protocols(self.what.get().strip())
+        self.proto.configure(text=("Протокол: если " + lc_first(ps[0]["if"]) + " — " + ps[0]["then"]) if ps else "")
+
+    def _save(self, result):
+        what = self.what.get().strip()
+        if not what:
+            messagebox.showwarning(APP_NAME, "Что тянет — одним-двумя словами.", parent=self)
+            return
+        self.destroy()
+        self.app.urge_log(what, self.power, result, self.note.get().strip())
+
+
+class ChecklistCard(tk.Frame):
+    """Боевой лист прямо в построении или сводке: пункты с галочками, отметка сохраняется сразу."""
+
+    def __init__(self, parent, app, checklist, day):
+        bg = parent.cget("bg")
+        super().__init__(parent, bg=bg)
+        F, px = app.fonts, app.px
+        sysm = app.system
+        state = sysm.check_state(day, checklist["id"])
+        n = len(checklist["items"])
+        head = tk.Label(self, text="", font=F["small_bold"], bg=bg, fg=C.FOCUS, anchor="w")
+        head.grid(row=0, column=0, columnspan=2, sticky="we")
+        self.columnconfigure(0, weight=1, uniform="cl")
+        self.columnconfigure(1, weight=1, uniform="cl")
+
+        def paint():
+            m = len(sysm.check_state(day, checklist["id"]) & set(range(n)))
+            head.configure(text=f"{checklist['title'].upper()} · {m} из {n}", fg=C.BREAK if m >= n else C.FOCUS)
+        paint()
+        for i, item in enumerate(checklist["items"]):
+            var = tk.BooleanVar(value=i in state)
+
+            def toggle(i=i, var=var):
+                app.check_toggle(day, checklist, i, var.get(), quiet=True)
+                paint()
+            tk.Checkbutton(self, text=item, variable=var, bg=bg, fg=C.INK, activebackground=bg, selectcolor=C.SURFACE,
+                           activeforeground=C.INK, font=F["small"], anchor="w", highlightthickness=0, bd=0,
+                           command=toggle).grid(row=1 + i // 2, column=i % 2, sticky="w")
+
+
+class FitnessView(KitView):
+    KEY = "fitness"
+    TITLE = "Физподготовка"
+    HINT = ("Нормативы с порогами «удовл. — хорошо — отлично», как на проверке по физо. Сдавай раз в месяц: замер "
+            "показывает, работает ли тренировка. День с замерами — +20 опыта.")
+
+    def __init__(self, master, app):
+        self.sel = None
+        super().__init__(master, app)
+
+    def buttons(self, head):
+        ttk.Button(head, text="Сдать нормативы", style="Work.TButton", command=self.app.fit_test).pack(side="right")
+        ttk.Button(head, text="Новый норматив", command=lambda: self.app.edit_norm(None)).pack(side="right",
+                                                                                             padx=self.app.px(6))
+
+    def render(self, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        rows, avg = sysm.fit_summary()
+        last = sysm.fit_last_date()
+        every = int(sysm.fit().get("every") or 0)
+        self.sub.configure(text=("последняя проверка " + (f"{last:%d.%m.%Y}" if last else "— ещё не было")))
+        grid = tk.Frame(self.body, bg=C.BG)
+        grid.pack(fill="x", pady=(0, px(10)))
+        graded = [g for _n, _l, g in rows if g is not None]
+        kpi_card(grid, app, 0, "Общая оценка", FIT_GRADES[int(round(avg))] if avg is not None else "—",
+                 [(f"средний балл {fmt_num(avg)} из 3 по {len(graded)} нормативам" if avg is not None
+                   else "сдай нормативы — появится оценка", None)],
+                 frac=(avg / 3) if avg is not None else 0.0, color=C.BREAK)
+        nxt = (last + timedelta(days=every)) if (last and every) else None
+        kpi_card(grid, app, 1, "Следующая проверка",
+                 ("сегодня" if nxt and nxt <= today else (f"{nxt:%d.%m}" if nxt else ("сейчас" if every else "—"))),
+                 [(f"раз в {days_word(every)}" if every else "напоминание выключено", None)],
+                 big_fg=C.LONG if (every and (not last or (nxt and nxt <= today))) else None)
+        monday = week_monday(today)
+        if sysm.active(today):
+            tr = sysm.trainings_between(monday, today)
+            kpi_card(grid, app, 2, "Тренировок на неделе", f"{tr} из {int(sysm.goal('trainings', 6))}",
+                     [("из вечерних сводок", None)], frac=tr / max(1, sysm.goal("trainings", 6)))
+        weight = sysm.norm_by_name("Вес")
+        wl = sysm.fit_last(weight) if weight else None
+        if wl:
+            tests = sysm.fit_tests(weight["id"])
+            delta = wl["value"] - tests[0]["value"] if len(tests) > 1 else None
+            kpi_card(grid, app, 3, "Вес", f"{fmt_fit_value('number', wl['value'])} {weight.get('unit') or ''}",
+                     [(f"{sys_date(wl['date']):%d.%m}" + (f", с первого замера {'+' if delta >= 0 else '−'}"
+                                                          f"{fmt_plain(round(abs(delta), 1))}" if delta is not None
+                                                          else ""), None)])
+
+        card = self.card()
+        self.h2(card, "Нормативы", "как считается", self._explain)
+        frame = tk.Frame(card, bg=C.LINE, padx=1, pady=1)
+        frame.pack(fill="x")
+        cols = [("name", "Норматив", 170, True), ("last", "Последний", 90, False), ("date", "Дата", 70, False),
+                ("grade", "Оценка", 80, False), ("best", "Лучший", 80, False), ("need", "До «отлично»", 100, False),
+                ("thr", "Пороги: удовл. / хор. / отл.", 190, False)]
+        tree = ttk.Treeview(frame, columns=[c[0] for c in cols], show="headings", selectmode="browse",
+                            height=max(1, len(rows)))
+        for key, text, w, stretch in cols:
+            tree.heading(key, text=text, anchor="w")
+            tree.column(key, width=px(w), minwidth=px(40), anchor="w", stretch=stretch)
+        tree.pack(fill="x")
+        for g, color in ((0, C.DANGER), (1, C.LONG), (2, C.FOCUS), (3, C.BREAK)):
+            tree.tag_configure(f"g{g}", foreground=color)
+        for n, lt, g in rows:
+            kind = n.get("kind")
+            best = sysm.fit_best(n)
+            need = ""
+            if lt and n.get("better") != "none" and len(n.get("grades") or []) == 3 and g is not None and g < 3:
+                top = float(n["grades"][2])
+                diff = top - lt["value"] if n["better"] == "more" else lt["value"] - top
+                need = ("+" if n["better"] == "more" else "−") + fmt_fit_value(kind, abs(diff))
+            thr = " / ".join(fmt_fit_value(kind, x) for x in n.get("grades") or []) or "без оценки"
+            tree.insert("", "end", iid=n["id"], tags=(f"g{g}",) if g is not None else (),
+                        values=(n["name"] + (f", {n['unit']}" if n.get("unit") and kind != "time" else ""),
+                                fmt_fit_value(kind, lt["value"]) if lt else "—",
+                                f"{sys_date(lt['date']):%d.%m}" if lt else "",
+                                FIT_GRADES[g] if g is not None else ("—" if n.get("better") != "none" else ""),
+                                fmt_fit_value(kind, best["value"]) if best else "", need, thr))
+        if self.sel and tree.exists(self.sel):
+            tree.selection_set(self.sel)
+        tree.bind("<<TreeviewSelect>>", lambda e: self._select(tree))
+        tree.bind("<Double-1>", lambda e: app.edit_norm(sysm.norm(tree.selection()[0])) if tree.selection() else None)
+        ui_text(card, app, "Клик — график и история, двойной клик — изменить норматив и пороги.").pack(
+            fill="x", pady=(px(4), 0))
+
+        norm = sysm.norm(self.sel) if self.sel else None
+        if norm is None and rows:
+            norm = next((n for n, lt, _g in rows if lt), rows[0][0])
+        if norm is not None:
+            self._history(norm)
+        off = [n for n in sysm.norms(True) if not n.get("on", True)]
+        if off:
+            card = self.card()
+            ui_text(card, app, "Выключены: " + ", ".join(n["name"] for n in off) + ". Включить — «изменить» в "
+                               "истории или двойной клик после включения.").pack(fill="x")
+            for n in off:
+                ui_link(card, app, f"включить «{n['name']}»", lambda nn=n: app.edit_norm(nn)).pack(anchor="w")
+
+    def _select(self, tree):
+        sel = tree.selection()
+        if sel and sel[0] != self.sel:
+            self.sel = sel[0]
+            self.refresh()
+
+    def _explain(self):
+        messagebox.showinfo(APP_NAME, "Оценка — по последнему замеру: не дотянул до «удовл.» — «неуд.», дальше "
+                                      "«удовл.», «хорошо», «отлично». Общая — средний балл по нормативам с порогами "
+                                      "(0 — неуд., 3 — отлично). Пороги стоят условные, под мужчину до 30 лет — "
+                                      "поменяй под себя двойным кликом. Бег — в минутах и секундах, «3:45».",
+                            parent=self.app)
+
+    def _history(self, n):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        card = self.card()
+        head = self.h2(card, f"{n['name']}: история")
+        ttk.Button(head, text="Замер", command=lambda: app.fit_test(n)).pack(side="right")
+        ui_link(head, app, "изменить", lambda: app.edit_norm(n)).pack(side="right", padx=px(10))
+        tests = sysm.fit_tests(n["id"])
+        if not tests:
+            ui_text(card, app, "Замеров пока нет.").pack(fill="x")
+            return
+        c = tk.Canvas(card, height=px(150), bg=C.SURFACE, highlightthickness=0)
+        c.pack(fill="x", pady=(px(4), px(6)))
+        c.bind("<Configure>", lambda e: self._draw(c, n, tests))
+        for t in reversed(tests[-10:]):
+            row = tk.Frame(card, bg=C.SURFACE)
+            row.pack(fill="x")
+            ui_link(row, app, "удалить", lambda tt=t: app.fit_delete(tt), fg=C.MUTED).pack(side="right")
+            g = fit_grade(n, t["value"])
+            ui_text(row, app, f"{sys_date(t['date']):%d.%m.%Y} · {fmt_fit_value(n['kind'], t['value'])}"
+                              + (f" · {FIT_GRADES[g]}" if g is not None else "") + (f" — {t['note']}" if t.get("note")
+                                                                                     else ""),
+                    fg=C.INK).pack(side="left", fill="x", expand=True)
+
+    def _draw(self, c, n, tests):
+        px = self.app.px
+        c.delete("all")
+        W, H = c.winfo_width(), c.winfo_height()
+        if W < 120 or not tests:
+            return
+        vals = [t["value"] for t in tests]
+        thr = [float(x) for x in n.get("grades") or []]
+        lo, hi = min(vals + thr), max(vals + thr)
+        if hi - lo < 1e-9:
+            lo, hi = lo - 1, hi + 1
+        pad = (hi - lo) * 0.1
+        lo, hi = lo - pad, hi + pad
+        L, R, T, B = px(46), px(10), px(8), px(20)
+
+        def y(v):
+            return T + (H - T - B) * (1 - (v - lo) / (hi - lo))
+        first, last = sys_date(tests[0]["date"]), sys_date(tests[-1]["date"])
+        span = max(1, (last - first).days)
+
+        def x(d):
+            return L + (W - L - R) * ((d - first).days / span if len(tests) > 1 else 0.5)
+        for v, color, name in zip(thr, (C.LONG, C.FOCUS, C.BREAK), FIT_GRADES[1:]):
+            c.create_line(L, y(v), W - R, y(v), fill=color, dash=(3, 3))
+            c.create_text(L - 4, y(v), text=fmt_fit_value(n["kind"], v), anchor="e", fill=color,
+                          font=self.app.fonts["tiny"])
+        pts = [(x(sys_date(t["date"])), y(t["value"])) for t in tests]
+        if len(pts) > 1:
+            c.create_line(*[p for xy in pts for p in xy], fill=C.INK, width=2)
+        for (xx, yy), t in zip(pts, tests):
+            c.create_oval(xx - 3, yy - 3, xx + 3, yy + 3, fill=C.INK, outline="")
+        c.create_text(L, H - 2, text=f"{first:%d.%m}", anchor="sw", fill=C.MUTED, font=self.app.fonts["tiny"])
+        if len(tests) > 1:
+            c.create_text(W - R, H - 2, text=f"{last:%d.%m}", anchor="se", fill=C.MUTED, font=self.app.fonts["tiny"])
+
+
+class FitTestDialog(tk.Toplevel):
+    """Проверка по физподготовке: сразу все нормативы на одну дату, пустое — не сдавал."""
+
+    def __init__(self, app, only=None):
+        ensure_visible(app)
+        super().__init__(app)
+        self.app = app
+        sysm = app.system
+        F, px = app.fonts, app.px
+        self.title("Сдать нормативы")
+        self.configure(bg=C.BG)
+        self.transient(app)
+        self.resizable(False, False)
+        body = tk.Frame(self, bg=C.BG, padx=px(22), pady=px(18))
+        body.pack(fill="both", expand=True)
+        tk.Label(body, text="Проверка по физподготовке" if only is None else f"Замер: {only['name']}", font=F["h1"],
+                 bg=C.BG, fg=C.INK).pack(anchor="w")
+        tk.Label(body, text="Пустое поле — норматив не сдавал. Бег — «3:45», планка — секунды или «2:10».",
+                 font=F["small"], bg=C.BG, fg=C.MUTED, anchor="w").pack(fill="x", pady=(px(2), px(10)))
+        form = tk.Frame(body, bg=C.BG)
+        form.pack(fill="x")
+        tk.Label(form, text="Дата", font=F["ui"], bg=C.BG, fg=C.MUTED).grid(row=0, column=0, sticky="w",
+                                                                              padx=(0, px(14)), pady=px(4))
+        self.date_var = tk.StringVar(value=app.today().strftime("%d.%m.%Y"))
+        ttk.Entry(form, textvariable=self.date_var, font=F["ui"], width=12).grid(row=0, column=1, sticky="w")
+        self.vars = {}
+        norms = [only] if only is not None else sysm.norms()
+        for r, n in enumerate(norms, 1):
+            tk.Label(form, text=n["name"], font=F["ui"], bg=C.BG, fg=C.INK).grid(row=r, column=0, sticky="w",
+                                                                                  padx=(0, px(14)), pady=px(3))
+            v = tk.StringVar()
+            e = ttk.Entry(form, textvariable=v, font=F["ui"], width=10)
+            e.grid(row=r, column=1, sticky="w")
+            if r == 1:
+                e.focus_set()
+            lt = sysm.fit_last(n)
+            hint = n.get("unit") or FIT_KINDS.get(n["kind"], "")
+            if lt:
+                hint += f" · было {fmt_fit_value(n['kind'], lt['value'])} ({sys_date(lt['date']):%d.%m})"
+            if len(n.get("grades") or []) == 3 and n.get("better") != "none":
+                hint += " · отл. " + fmt_fit_value(n["kind"], n["grades"][2])
+            tk.Label(form, text=hint, font=F["small"], bg=C.BG, fg=C.MUTED).grid(row=r, column=2, sticky="w",
+                                                                                 padx=(px(10), 0))
+            self.vars[n["id"]] = (n, v)
+        self.note = tk.StringVar()
+        r = len(norms) + 1
+        tk.Label(form, text="Заметка", font=F["ui"], bg=C.BG, fg=C.MUTED).grid(row=r, column=0, sticky="w",
+                                                                                 padx=(0, px(14)), pady=px(4))
+        ttk.Entry(form, textvariable=self.note, font=F["ui"], width=36).grid(row=r, column=1, columnspan=2,
+                                                                             sticky="we")
+        btns = tk.Frame(body, bg=C.BG)
+        btns.pack(fill="x", pady=(px(14), 0))
+        ttk.Button(btns, text="Сохранить", style="Work.TButton", command=self._save).pack(side="right")
+        ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=(0, px(8)))
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.bind("<Return>", lambda e: self._save())
+        dialog_place(self, app, 70)
+        dialog_grab(self)
+
+    def _save(self):
+        app, sysm = self.app, self.app.system
+        try:
+            d = parse_date(self.date_var.get(), app.today()) or app.today()
+        except ValueError:
+            messagebox.showwarning(APP_NAME, "Дата: 25.10 или 25.10.2026.", parent=self)
+            return
+        if d > app.today():
+            messagebox.showwarning(APP_NAME, "Замер из будущего не принимается.", parent=self)
+            return
+        vals = []
+        for n, v in self.vars.values():
+            raw = v.get().strip()
+            if not raw:
+                continue
+            try:
+                vals.append((n, parse_fit_value(n["kind"], raw)))
+            except ValueError as exc:
+                messagebox.showwarning(APP_NAME, f"«{n['name']}»: {exc}.", parent=self)
+                return
+        if not vals:
+            messagebox.showwarning(APP_NAME, "Ни одного значения: впиши хотя бы один норматив.", parent=self)
+            return
+        self.destroy()
+        app.fit_save(d, vals, self.note.get().strip())
+
+
+MONTHS_NOM = ("Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь",
+              "Ноябрь", "Декабрь")
+MONEY_HINT = "350 кафе шаурма · 1,2к продукты · 900 одежда футболка ! — «!» в конце: импульсная покупка"
+
+
+def parse_money_line(text, cats):
+    """«350 кафе шаурма !» → (350.0, «Кафе и доставка», «шаурма», импульс). Ошибка — ValueError."""
+    t = (text or "").strip()
+    impulse = False
+    if t.endswith("!"):
+        impulse, t = True, t[:-1].strip()
+    m = re.match(r"(\d+(?:[.,]\d+)?)(\s*[кk](?=\s|$))?\s*(?:₽|р\.?|руб\.?)?(?=\s|$)\s*(.*)$", t,
+                 flags=re.IGNORECASE | re.S)
+    if not m:
+        raise ValueError("начни с суммы: «350 кафе шаурма»")
+    amount = parse_money(m[1] + ("к" if m[2] else ""))
+    rest = m[3].strip()
+    if re.search(r"\bимпульс\w*\b", rest, flags=re.IGNORECASE):
+        impulse = True
+        rest = re.sub(r"\s*\bимпульс\w*\b", "", rest, flags=re.IGNORECASE).strip()
+    cat, note = None, rest
+    if rest:
+        words = rest.split()
+        for k in range(min(3, len(words)), 0, -1):
+            q = " ".join(words[:k]).lower()
+            hit = (next((c for c in cats if c.lower() == q), None) or next((c for c in cats if c.lower().startswith(q)),
+                                                                          None)
+                   or next((c for c in cats if any(w.startswith(q) for w in c.lower().split())), None))
+            if hit:
+                cat, note = hit, " ".join(words[k:])
+                break
+    return amount, cat or ("Прочее" if "Прочее" in cats else (cats[-1] if cats else "Прочее")), note, impulse
+
+
+class MoneyView(KitView):
+    KEY = "money"
+    TITLE = "Казна"
+    HINT = ("Довольствие под контролем: траты за минуту, лимит на месяц, дневной остаток, дни без трат. Покупка не по "
+            "плану — в список желаний: решение через 48 часов, отказ — в «сэкономлено».")
+
+    def __init__(self, master, app):
+        self.month = app.today().replace(day=1)
+        super().__init__(master, app)
+
+    def buttons(self, head):
+        app = self.app
+        ttk.Button(head, text="Лимиты", command=app.money_limits).pack(side="right")
+        ttk.Button(head, text="Доход", command=lambda: app.edit_money(None, kind="in")).pack(side="right",
+                                                                                         padx=app.px(6))
+        ttk.Button(head, text="В список желаний", command=lambda: app.edit_wish(None)).pack(side="right")
+
+    def render(self, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        cur = sysm.money_cur()
+        mm = sysm.money_month(today)
+        self.sub.configure(text=f"сегодня {fmt_money(mm['today'], cur)} · без трат подряд "
+                                f"{days_word(sysm.nospend_streak(today))}")
+        card = self.card()
+        row = tk.Frame(card, bg=C.SURFACE)
+        row.pack(fill="x")
+        tk.Label(row, text="Трата", font=F["ui_bold"], bg=C.SURFACE, fg=C.INK).pack(side="left", padx=(0, px(10)))
+        self.entry_var = tk.StringVar()
+        e = ttk.Entry(row, textvariable=self.entry_var, font=F["ui"])
+        e.pack(side="left", fill="x", expand=True)
+        e.bind("<Return>", lambda ev: self._quick())
+        ttk.Button(row, text="Записать", style="Work.TButton", command=self._quick).pack(side="left", padx=(px(8), 0))
+        ttk.Button(row, text="Подробно", command=lambda: app.edit_money(None)).pack(side="left", padx=(px(6), 0))
+        ui_text(card, app, MONEY_HINT + ". Категории: " + ", ".join(sysm.money_cats()) + ".").pack(
+            fill="x", pady=(px(4), 0))
+
+        grid = tk.Frame(self.body, bg=C.BG)
+        grid.pack(fill="x", pady=(0, px(10)))
+        month_name = f"{MONTHS_NOM[today.month - 1]}"
+        if mm["limit"]:
+            pace_mark = ((today - mm["a"]).days + 1) / ((mm["b"] - mm["a"]).days + 1)
+            over = mm["spent"] > mm["limit"]
+            kpi_card(grid, app, 0, f"{month_name}: потрачено", fmt_money(mm["spent"], cur),
+                     [(f"из {fmt_money(mm['limit'], cur)}" + (f", перерасход {fmt_money(mm['spent'] - mm['limit'], cur)}"
+                                                              if over else f", осталось {fmt_money(mm['left'], cur)}"),
+                       C.DANGER if over else None)],
+                     frac=mm["spent"] / mm["limit"], mark=pace_mark, color=C.DANGER if over else C.FOCUS)
+            per = mm["per_day"]
+            kpi_card(grid, app, 1, "Можно в день", fmt_money(max(0.0, per), cur) if per is not None else "—",
+                     [(f"до конца месяца {days_word(mm['days_left'])}, включая сегодня", None),
+                      (f"сегодня уже {fmt_money(mm['today'], cur)}", C.DANGER if per is not None and mm["today"] > per
+                       else None)], big_fg=C.DANGER if per is not None and per <= 0 else None)
+        else:
+            kpi_card(grid, app, 0, f"{month_name}: потрачено", fmt_money(mm["spent"], cur),
+                     [("лимит на месяц не задан — кнопка «Лимиты»", C.LONG)])
+            kpi_card(grid, app, 1, "Сегодня", fmt_money(mm["today"], cur), [("без лимита дневной остаток не считается",
+                                                                                None)])
+        kpi_card(grid, app, 2, "Без трат", days_word(sysm.nospend_streak(today)),
+                 [(f"подряд; в этом месяце дней без трат: {mm['nospend']}", None)])
+        kpi_card(grid, app, 3, "Импульсные", f"{mm['impulse_n']}",
+                 [(f"на {fmt_money(mm['impulse_sum'], cur)} за месяц", C.DANGER if mm["impulse_n"] else None),
+                  (f"сэкономлено отказами: {fmt_money(sysm.money_saved(), cur)}", C.BREAK)])
+
+        card = self.card()
+        self.h2(card, "По категориям за месяц")
+        cats = [x for x in mm["cats"] if x[1] or x[2]]
+        if not cats:
+            ui_text(card, app, "Трат в этом месяце ещё нет.").pack(fill="x")
+        for name, spent, limit in sorted(cats, key=lambda x: -x[1]):
+            r = tk.Frame(card, bg=C.SURFACE)
+            r.pack(fill="x", pady=px(2))
+            tk.Label(r, text=name, font=F["ui"], bg=C.SURFACE, fg=C.INK, width=20, anchor="w").pack(side="left")
+            over = limit and spent > limit
+            tk.Label(r, text=fmt_money(spent, cur) + (f" из {fmt_money(limit, cur)}" if limit else ""), font=F["small"],
+                     bg=C.SURFACE, fg=C.DANGER if over else C.MUTED, width=22, anchor="e").pack(side="right")
+            top = max(x[1] for x in cats) or 1
+            Bar(r, app, spent / limit if limit else spent / top, C.DANGER if over else (C.FOCUS if limit else C.LONG)
+                ).pack(side="left", fill="x", expand=True, padx=px(8))
+
+        wishes = [w for w in sysm.money()["wishes"] if w.get("status") == "wait"]
+        card = self.card()
+        head = self.h2(card, f"Список желаний · правило {int(sysm.money().get('cooldown') or 0)} часов")
+        ttk.Button(head, text="Добавить", command=lambda: app.edit_wish(None)).pack(side="right")
+        if not wishes:
+            ui_text(card, app, "Хочется купить не по плану — запиши сюда. Через 48 часов желание чаще всего проходит "
+                               "само; если нет — покупаешь осознанно, а не на импульсе.").pack(fill="x")
+        now = PLATFORM["now"]()
+        for w in wishes:
+            r = tk.Frame(card, bg=C.SURFACE)
+            r.pack(fill="x", pady=px(2))
+            ready = sysm.wish_ready(w, now)
+            ttk.Button(r, text="Отказался", command=lambda ww=w: app.wish_set(ww, "dropped")).pack(side="right")
+            ttk.Button(r, text="Купил", command=lambda ww=w: app.wish_set(ww, "bought"),
+                       state="normal" if ready else "disabled").pack(side="right", padx=px(6))
+            try:
+                until = datetime.fromisoformat(w["added"]) + timedelta(hours=int(sysm.money().get("cooldown") or 0))
+                when = "можно решать" if ready else f"решение после {until:%d.%m %H:%M}"
+            except (KeyError, ValueError):
+                when = ""
+            tk.Label(r, text=w["title"], font=F["ui_bold"], bg=C.SURFACE, fg=C.INK).pack(side="left")
+            ui_text(r, app, f"  {fmt_money(w.get('price') or 0, cur)} · {when}" + (f" — {w['note']}" if w.get("note")
+                                                                                    else ""),
+                    fg=C.BREAK if ready else C.MUTED).pack(side="left", fill="x", expand=True)
+        done = [w for w in sysm.money()["wishes"] if w.get("status") != "wait"][-5:]
+        for w in reversed(done):
+            ui_text(card, app, f"{WISH_STATUS[w['status']]}: {w['title']} — {fmt_money(w.get('price') or 0, cur)}",
+                    fg=C.BREAK if w["status"] == "dropped" else C.MUTED).pack(fill="x")
+
+        card = self.card()
+        head = self.h2(card, "Записи")
+        nav = tk.Frame(head, bg=C.SURFACE)
+        nav.pack(side="right")
+        ui_link(nav, app, "◀", lambda: self._shift(-1), font="ui").pack(side="left")
+        tk.Label(nav, text=f"{MONTHS_NOM[self.month.month - 1].lower()} {self.month.year}", font=F["ui"],
+                 bg=C.SURFACE, fg=C.INK).pack(side="left", padx=px(8))
+        ui_link(nav, app, "▶", lambda: self._shift(1), font="ui").pack(side="left")
+        a, b = month_bounds(self.month)
+        entries = sorted(sysm.money_entries(a, b, None), key=lambda e: (e["date"], e.get("ts", "")), reverse=True)
+        if not entries:
+            ui_text(card, app, "Записей за месяц нет.").pack(fill="x")
+            return
+        frame = tk.Frame(card, bg=C.LINE, padx=1, pady=1)
+        frame.pack(fill="x")
+        cols = [("date", "Дата", 80, False), ("sum", "Сумма", 110, False), ("cat", "Категория", 160, False),
+                ("note", "Заметка", 300, True), ("flag", "", 90, False)]
+        tree = ttk.Treeview(frame, columns=[c[0] for c in cols], show="headings", selectmode="extended",
+                            height=min(14, len(entries)))
+        for key, text, w, stretch in cols:
+            tree.heading(key, text=text, anchor="w")
+            tree.column(key, width=px(w), minwidth=px(30), anchor="e" if key == "sum" else "w", stretch=stretch)
+        tree.pack(fill="x")
+        tree.tag_configure("in", foreground=C.BREAK)
+        tree.tag_configure("imp", foreground=C.DANGER)
+        for e in entries:
+            d = sys_date(e["date"])
+            tree.insert("", "end", iid=e["id"], tags=("in",) if e.get("kind") == "in" else (("imp",) if e.get("impulse")
+                                                                                             else ()),
+                        values=(f"{WD_SHORT[d.weekday()]} {d:%d.%m}",
+                                ("+" if e.get("kind") == "in" else "") + fmt_money(e["sum"], cur),
+                                e.get("cat") or "", e.get("note") or "",
+                                "доход" if e.get("kind") == "in" else ("импульс" if e.get("impulse") else "")))
+        tree.bind("<Double-1>", lambda ev: self._edit(tree))
+        tree.bind("<Delete>", lambda ev: self._delete(tree))
+        ui_text(card, app, f"Итого за месяц: траты {fmt_money(sum(e['sum'] for e in entries if e['kind'] == 'out'), cur)}"
+                           f", доход {fmt_money(sum(e['sum'] for e in entries if e['kind'] == 'in'), cur)}. "
+                           "Двойной клик — изменить, Delete — удалить.").pack(fill="x", pady=(px(4), 0))
+
+    def _shift(self, k):
+        m = self.month.month - 1 + k
+        self.month = date(self.month.year + m // 12, m % 12 + 1, 1)
+        self.refresh()
+
+    def _quick(self):
+        app, sysm = self.app, self.app.system
+        text = self.entry_var.get().strip()
+        if not text:
+            return
+        try:
+            amount, cat, note, impulse = parse_money_line(text, sysm.money_cats())
+        except ValueError as exc:
+            messagebox.showwarning(APP_NAME, f"Трата: {exc}.", parent=app)
+            return
+        app.money_record(app.today(), amount, cat, note, impulse)
+
+    def _entry(self, tree):
+        sel = tree.selection()
+        if not sel:
+            return None
+        return next((e for e in self.app.system.money()["entries"] if e["id"] == sel[0]), None)
+
+    def _edit(self, tree):
+        e = self._entry(tree)
+        if e is not None:
+            self.app.edit_money(e)
+
+    def _delete(self, tree):
+        ids = set(tree.selection())
+        if ids:
+            self.app.money_delete(ids)
+
+
 class App(tk.Tk):
+    # первые десять — Ctrl+1 … Ctrl+0 (порядок с 9.0 не меняется, новые разделы — в конце)
     ORDER = ("system", "focus", "tasks", "week", "projects", "grades", "notes", "network", "habits", "log",
-             "timer", "stats", "settings")
+             "timer", "stats", "settings", "discipline", "fitness", "money")
 
     def __init__(self, start_minimized=False, instance=None, moved=None):
         super().__init__(className=APP_ID)
@@ -20690,6 +23285,11 @@ class App(tk.Tk):
         if self._system_new:
             self.store.save()
         self.system = System(self)
+        try:
+            if self.system.maybe_switch(self.today()):
+                self.store.save()
+        except Exception:
+            traceback.print_exc()
         self.notes_store, self._notes_broken = open_note_store(NOTES_DB)
         self.notes_store.today_fn = self.today
         self.notes_store.backup_daily(BACKUP_DIR)
@@ -20762,6 +23362,7 @@ class App(tk.Tk):
         self.hotkeys = GlobalHotkeys(self)
         if IS_WIN and self.store.settings.get("global_hotkeys", True):
             self.hotkeys.start([("Ctrl+Alt+I", 0x49, self.open_capture),
+                                ("Ctrl+Alt+U", 0x55, self.open_urge),
                                 ("Ctrl+Alt+P", 0x50, self.pomo.toggle),
                                 ("Ctrl+Alt+T", 0x54, self.show_main)])
         if IS_MAC:
@@ -20933,8 +23534,20 @@ class App(tk.Tk):
             "timer": TimerView(self.content, self),
             "stats": StatsView(self.content, self),
             "settings": SettingsView(self.content, self),
+            "discipline": DisciplineView(self.content, self),
+            "fitness": FitnessView(self.content, self),
+            "money": MoneyView(self.content, self),
         }
         self._views_ready = True
+
+    def rebuild_sidebar(self):
+        if not self._views_ready:
+            return
+        self.sidebar.destroy()
+        self.sidebar = Sidebar(self)
+        self.sidebar.pack(side="left", fill="y", before=self._sep)
+        if self.current_view:
+            self.sidebar.set_active(self.current_view)
 
     def apply_theme(self, choice):
         self.store.settings["theme"] = choice
@@ -20981,6 +23594,7 @@ class App(tk.Tk):
                   (("z", "Z", "Cyrillic_ya", "Cyrillic_YA"), self.undo),
                   (("k", "K", "Cyrillic_el", "Cyrillic_EL"), self.open_palette),
                   (("i", "I", "Cyrillic_sha", "Cyrillic_SHA"), self.open_capture),
+                  (("u", "U", "Cyrillic_ghe", "Cyrillic_GHE"), self.open_urge),
                   (("p", "P", "Cyrillic_ze", "Cyrillic_ZE"), self.open_palette),
                   (("q", "Q", "Cyrillic_shorti", "Cyrillic_SHORTI"), self.request_quit)]
         for mod in mods:
@@ -21432,12 +24046,17 @@ class App(tk.Tk):
             today = self.today()
             if today != self._last_day:
                 self._last_day = today
+                if self.system.maybe_switch(today):
+                    self.store.save()
+                    self.toast(f"Развёрнута «{self.system.name()}». Итоги прошлой — в послужном списке.",
+                               lambda: self.views["system"].set_tab("plan"), "Устав", ms=20000)
                 if not self.pomo.is_active():
                     self.pomo.cycle_done = 0
                 self.refresh_all()
                 self.on_pomo_change()
                 self.after(800, self._day_prompt)
             self._pause_check()
+            self._urge_tick()
             self.coach.tick()
             self.tray.update()
             while True:
@@ -21614,10 +24233,6 @@ class App(tk.Tk):
             pass
         self.save_engine_state()
         self.store.save()
-        try:
-            self.coach.track.close()
-        except Exception:
-            pass
         try:
             if self._views_ready:
                 self.views["notes"].save_all()
@@ -21883,6 +24498,23 @@ class App(tk.Tk):
                   ("Ставка: календарь и рубежи", "", lambda: sysv.set_tab("calendar")),
                   ("Ставка: устав", "", lambda: sysv.set_tab("plan")),
                   ("Новое событие в календаре", "", lambda: self.edit_event(None))]
+        disc, fit, money = self.views["discipline"], self.views["fitness"], self.views["money"]
+        items += [("Перехват соблазна (ПВО)", "Ctrl+U", self.open_urge),
+                  ("Дисциплина: ПВО", "", lambda: disc.set_tab("pvo")),
+                  ("Дисциплина: протоколы «если — то»", "", lambda: disc.set_tab("protocols")),
+                  ("Дисциплина: боевые листы", "", lambda: disc.set_tab("lists")),
+                  ("Новый протокол «если — то»", "", lambda: self.edit_protocol(None)),
+                  ("Новый боевой лист", "", lambda: self.edit_checklist(None)),
+                  ("Сдать нормативы по физподготовке", "", self.fit_test),
+                  ("Физподготовка", "", lambda: self._goto("fitness")),
+                  ("Казна: записать трату", "", lambda: self.edit_money(None)),
+                  ("Казна: список желаний", "", lambda: self.edit_wish(None)),
+                  ("Казна: лимиты", "", self.money_limits),
+                  ("Казна", "", lambda: self._goto("money")),
+                  ("Ставка: личное дело", "", lambda: sysv.set_tab("dossier")),
+                  ("Правила дисциплины", "", lambda: sysv._edit_rules()),
+                  ("Итоговый разбор кампании", "", lambda: self.final_review()),
+                  ("Новая кампания", "", self.new_campaign)]
         items += [("Новая задача", "Ctrl+N", self._new_task),
                  ("Спланировать день", "", self.plan_day),
                  ("Добавить задачи списком", "", self.bulk_add),
@@ -22060,8 +24692,8 @@ class App(tk.Tk):
             return False
         if name == DEFENSE_TYPE and sysm.day_type(day) != DEFENSE_TYPE:
             n = sysm.defense_count(day) + 1
-            if confirm and n > DEFENSE_FREE and not messagebox.askyesno(
-                    APP_NAME, f"Это {n}-я оборона за 7 дней. Две — бесплатно, дальше — штраф "
+            if confirm and n > sysm.rule("defense_free") and not messagebox.askyesno(
+                    APP_NAME, f"Это {n}-я оборона за 7 дней. Бесплатно — {sysm.rule('defense_free')}, дальше — штраф "
                               f"{sysm.penalty_cfg()['defense']} очков опыта. Объявить оборону?", parent=self):
                 return False
             sysm.journal_add("defense", f"{day:%d.%m}: норма {fmt_h(sysm.type_hours(DEFENSE_TYPE))} ч")
@@ -22656,6 +25288,9 @@ class App(tk.Tk):
             self._sys_changed()
             self.check_milestones()
             return True, f"касание: {c['name']} ({kind.lower()})"
+        r = self.quick_kit(s, low, today, source)
+        if r is not None:
+            return r
         if not sysm.active(today):
             return None
         m = re.fullmatch(r"сон\s+(\d{1,2}(?:[.,]\d+)?|\d{1,2}:\d{2})", low)
@@ -22710,6 +25345,73 @@ class App(tk.Tk):
             sysm.day_update(today, note=m[1].strip())
             self._sys_changed()
             return True, "главное за день записано"
+        return None
+
+    def quick_kit(self, s, low, today, source=None):
+        """Строки 10.0: «перехват ютуб 4», «устоял», «трата 350 кафе», «доход 5000», «вес 73,5»,
+        «норматив подтягивания 14». (True/False, текст) или None, если это не они."""
+        sysm = self.system
+        m = re.fullmatch(r"(?:перехват|соблазн)\s+(.+)", s, flags=re.IGNORECASE | re.S)
+        if m:
+            what, power, note = parse_urge(m[1], sysm.urge_kinds())
+            u = sysm.urge_add(what, power, None, note, source=source)
+            self._sys_changed()
+            protos = sysm.protocols(u["what"])
+            return True, (f"перехват «{u['what']}», сила {u['power']}: держись {sysm.urge_hold()} минут"
+                          + (f". Протокол: {protos[0]['then'].rstrip('.')}" if protos else ""))
+        m = re.fullmatch(r"(устоял|сорвался)\s*(.*)", low)
+        if m:
+            result = "held" if m[1] == "устоял" else "fell"
+            if m[2].strip():
+                what, power, note = parse_urge(s.split(None, 1)[1], sysm.urge_kinds())
+                sysm.urge_add(what, power, result, note, source=source)
+            else:
+                opened = sorted(sysm.urge_open(), key=lambda u: u["ts"])
+                if not opened:
+                    return False, "открытых перехватов нет: «перехват ютуб 4» — записать"
+                what = opened[-1].get("what")
+                sysm.urge_resolve(opened[-1], result)
+            self._sys_changed()
+            return True, (f"устоял: «{what}», без срыва {days_word(sysm.urge_clean_days(today))}" if result == "held"
+                          else f"сорвался: «{what}» — отмечено честно, не пропускать дважды")
+        m = re.fullmatch(r"(трата|расход|потратил|доход)\s+(.+)", s, flags=re.IGNORECASE | re.S)
+        if m:
+            kind = "in" if m[1].lower() == "доход" else "out"
+            try:
+                cats = sysm.money_cats() + ([MONEY_IN_CAT] if kind == "in" else [])
+                amount, cat, note, impulse = parse_money_line(m[2], cats)
+            except ValueError as exc:
+                return False, f"«{s}»: {exc}"
+            if kind == "in" and cat == "Прочее" and MONEY_IN_CAT in cats:
+                cat = MONEY_IN_CAT
+            sysm.money_add(today, amount, cat, note, impulse and kind == "out", kind, source)
+            self._sys_changed()
+            cur = sysm.money_cur()
+            if kind == "in":
+                return True, f"доход {fmt_money(amount, cur)}"
+            mm = sysm.money_month(today)
+            tail = (f", на месяц осталось {fmt_money(mm['left'], cur)}" if mm["limit"] and mm["left"] >= 0 else
+                    (f", перерасход {fmt_money(-mm['left'], cur)}" if mm["limit"] else ""))
+            return True, f"−{fmt_money(amount, cur)} · {cat}" + (" · импульс" if impulse else "") + tail
+        m = re.fullmatch(r"вес\s+(\d+(?:[.,]\d+)?)\s*(?:кг)?", low)
+        name, raw = ("Вес", m[1]) if m else (None, None)
+        if not m:
+            m = re.fullmatch(r"(?:норматив|замер)\s+(.+?)\s+(\d[\d:.,]*)\s*(?:раз|сек|с|мин|кг)?", low)
+            name, raw = (m[1], m[2]) if m else (None, None)
+        if name:
+            n = sysm.norm_by_name(name)
+            if n is None:
+                return False, f"норматива «{name}» нет — добавь его в «Физподготовке»"
+            try:
+                value = parse_fit_value(n["kind"], raw)
+            except ValueError as exc:
+                return False, f"«{n['name']}»: {exc}"
+            sysm.fit_add(n["id"], today, value, "")
+            self._sys_changed()
+            g = fit_grade(n, value)
+            unit = f" {n['unit']}" if n.get("unit") and n["kind"] == "number" else ""
+            return True, f"{n['name']} {fmt_fit_value(n['kind'], value)}{unit}" + (f" — {FIT_GRADES[g]}" if g is not None
+                                                                                   else "")
         return None
 
     def open_report(self, kind="day"):
@@ -22782,7 +25484,8 @@ class App(tk.Tk):
     def ask_reserve(self, day=None, after=None):
         sysm = self.system
         today = self.today()
-        day = day or (today if PLATFORM["now"]() < at_time(today, RESERVE_DEADLINE) else today + timedelta(days=1))
+        day = day or (today if PLATFORM["now"]() < at_time(today, sysm.rule("reserve_deadline"))
+                      else today + timedelta(days=1))
         total, left = sysm.reserve_total(today), sysm.reserve_left(today)
         if left <= 0:
             messagebox.showwarning(APP_NAME, "Резерв Ставки исчерпан. Остаются оборона (3 часа) и перенос нормы.",
@@ -22812,23 +25515,23 @@ class App(tk.Tk):
                     after()
         FormDialog(self, "Резерв Ставки", [
             {"key": "day", "label": "День", "kind": "date", "value": day.isoformat(), "required": True,
-             "hint": f"на сегодня — до {RESERVE_DEADLINE}; заранее — на любой день кампании"},
+             "hint": f"на сегодня — до {sysm.rule('reserve_deadline')}; заранее — на любой день кампании"},
             {"key": "reason", "label": "Причина", "value": "", "required": True, "hint": "запишется в журнал"},
         ], save, ok_text="Объявить резерв",
             note=f"Резерв — день без нормы: серия не рвётся, наряда нет. Осталось {left} из {total}. Каждые "
-                 f"{RESERVE_EARN_STREAK} засчитанных дней подряд дают ещё +1.")
+                 f"{sysm.rule('reserve_earn_streak')} засчитанных дней подряд дают ещё +1.")
 
     def ask_carry(self, day=None):
         sysm = self.system
         today = self.today()
         now = PLATFORM["now"]()
         if day is None:
-            day = today if now >= at_time(today, CARRY_FROM) else today - timedelta(days=1)
+            day = today if now >= at_time(today, sysm.rule("carry_from")) else today - timedelta(days=1)
         allowed, why = sysm.carry_info(day, now)
         if allowed <= 0:
             messagebox.showinfo(APP_NAME, f"Перенос с {day:%d.%m} невозможен: {why}.", parent=self)
             return
-        targets = sysm.duty_days(day, 2)
+        targets = sysm.duty_days(day, sysm.rule("carry_days"))
 
         def save(v):
             hours = float(v["hours"] or 0)
@@ -22843,8 +25546,9 @@ class App(tk.Tk):
              "step": 0.25},
             {"key": "reason", "label": "Причина", "value": "", "required": True},
         ], save, ok_text="Перенести",
-            note=f"Недобор уйдёт поровну на {', '.join(f'{t:%d.%m}' for t in targets)}. Не чаще {CARRY_MAX_WEEK} раз в "
-                 f"неделю, общий долг — до {fmt_h(CARRY_MAX_DEBT)} ч. Сейчас долг {fmt_h(sysm.carry_debt(today))} ч.")
+            note=f"Недобор уйдёт поровну на {', '.join(f'{t:%d.%m}' for t in targets)}. Не чаще "
+                 f"{sysm.rule('carry_max_week')} раз в неделю, общий долг — до {fmt_h(sysm.rule('carry_max_debt'))} ч. "
+                 f"Сейчас долг {fmt_h(sysm.carry_debt(today))} ч.")
 
     def do_backplan(self, row):
         made = self.system.backplan(row, self.today())
@@ -22857,18 +25561,498 @@ class App(tk.Tk):
             self.toast("До рубежа меньше суток: план не нужен, нужен штурм")
 
     def close_write_duty(self, duty):
+        need = self.system.rule("write_min")
+
         def save(v):
             text = v["text"].strip()
-            if len(text) < WRITE_MIN:
-                messagebox.showwarning(APP_NAME, f"Разбор: {len(text)} знаков из {WRITE_MIN}. Что произошло, почему, "
+            if len(text) < need:
+                messagebox.showwarning(APP_NAME, f"Разбор: {len(text)} знаков из {need}. Что произошло, почему, "
                                                  "что меняю и как проверю.", parent=self)
                 return False
             self.system.duty_close(duty, "done", text)
             self._sys_changed("Наряд выполнен: разбор сдан")
         FormDialog(self, duty.get("title", "Письменный разбор"), [
             {"key": "text", "label": "Разбор", "kind": "text", "height": 10, "width": 64, "value": duty.get("note") or "",
-             "hint": f"что произошло, почему, что меняю и как проверю — от {WRITE_MIN} знаков"}],
+             "hint": f"что произошло, почему, что меняю и как проверю — от {need} знаков"}],
             save, ok_text="Сдать разбор", note=f"Наряд: {duty.get('reason', '')}.")
+
+    # --- 10.0: ПВО ---
+    def open_urge(self, _e=None):
+        self._ensure_main()
+        UrgeDialog(self)
+        return "break"
+
+    def urge_log(self, what, power=3, result=None, note="", source=None):
+        sysm = self.system
+        u = sysm.urge_add(what, power, result, note, source=source)
+        self.store.save()
+        self.refresh_all()
+        protos = sysm.protocols(u["what"])
+        tip = f" Протокол: {protos[0]['then']}" if protos else ""
+        if result == "held":
+            self.toast(f"Перехват засчитан: «{u['what']}» сбит. +5 опыта.", ms=6000)
+        elif result == "fell":
+            self.toast("Отмечено честно — это тоже дисциплина. Не пропускать дважды: вернись к плану." + tip, ms=9000)
+        else:
+            self.toast(f"Держись {sysm.urge_hold()} минут: волна спадёт.{tip}", ms=12000)
+        return u
+
+    def urge_result(self, u, result):
+        sysm = self.system
+        sysm.urge_resolve(u, result)
+        self.store.save()
+        self.refresh_all()
+        if result == "held":
+            self.toast(f"Устоял: «{u.get('what')}». +5 опыта, серия без срыва — "
+                       f"{days_word(sysm.urge_clean_days(self.today()))}.", ms=6000)
+        else:
+            self.toast("Сорвался — отмечено. Один срыв — не провал, два подряд — сигнал пересобрать протокол.", ms=7000)
+
+    def urge_delete(self, u):
+        if u in self.system.urges():
+            self.system.urges().remove(u)
+            self.system.invalidate()
+            self._commit()
+
+    def _urge_tick(self):
+        """Удержание кончилось — спросить итог: на компьютере карточкой, с телефона — в Telegram."""
+        if time.time() - getattr(self, "_urge_checked", 0) < 3:
+            return
+        self._urge_checked = time.time()
+        sysm, coach = self.system, self.coach
+        for u in sysm.urge_due():
+            if u.get("asked"):
+                continue
+            if u.get("src") == "phone":
+                u["asked"] = True
+                coach.tg_self(f"Генштаб · ПВО: {sysm.urge_hold()} минут прошло. «{u.get('what')}» — устоял? Ответь "
+                              "«устоял» или «сорвался».", "bot")
+                self.store.save()
+                continue
+            card = coach.show_card(
+                "urge", f"Перехват: {u.get('what')}",
+                f"{sysm.urge_hold()} минут прошло. Устоял? Честный ответ важнее красивой статистики.",
+                [("Устоял", lambda uu=u: self.urge_result(uu, "held")),
+                 ("Сорвался", lambda uu=u: self.urge_result(uu, "fell")),
+                 ("Ещё 5 минут", lambda uu=u: self._urge_more(uu))],
+                level=1, timeout=600, priority=3, motivate=False)
+            if card is not None:
+                u["asked"] = True
+                self.store.save()
+            break
+
+    def _urge_more(self, u):
+        u["until"] = (PLATFORM["now"]() + timedelta(minutes=5)).isoformat(timespec="seconds")
+        u.pop("asked", None)
+        self.store.save()
+        self.refresh_all()
+
+    # --- 10.0: протоколы и боевые листы ---
+    def edit_protocol(self, p):
+        sysm = self.system
+        pp = p or {}
+
+        def save(v):
+            kinds = [x.strip() for x in re.split(r"[,;\n]+", v["urges"]) if x.strip()]
+            fields = {"if": v["if"], "then": v["then"], "urges": kinds, "on": v["on"]}
+            if p:
+                p.update(fields)
+            else:
+                fields["id"] = _sid()
+                sysm.s["protocols"].append(fields)
+            self._sys_changed("Протокол принят")
+
+        def delete():
+            if not messagebox.askyesno(APP_NAME, "Удалить протокол?", parent=self):
+                return False
+            sysm.s["protocols"].remove(p)
+            self._sys_changed("Протокол удалён")
+        FormDialog(self, "Протокол «если — то»", [
+            {"key": "if", "label": "Если", "value": pp.get("if", ""), "required": True,
+             "hint": "ситуация или сигнал: «к 15:00 меньше половины нормы», «тянет в ленту»"},
+            {"key": "then", "label": "То", "kind": "text", "value": pp.get("then", ""), "height": 3, "required": True,
+             "hint": "конкретное действие, которое делается сразу, без раздумий"},
+            {"key": "urges", "label": "В ПВО при", "value": ", ".join(pp.get("urges") or []),
+             "hint": "через запятую — соблазны, при которых показывать: " + ", ".join(URGE_KINDS[:6]) + "…"},
+            {"key": "on", "label": "Действует", "kind": "check", "value": pp.get("on", True)},
+        ], save, on_delete=delete if p else None, width=50)
+
+    def edit_checklist(self, c):
+        sysm = self.system
+        cc = c or {}
+        whens = {v: k for k, v in CHECK_WHEN.items()}
+
+        def save(v):
+            try:
+                days = parse_weekdays(v["days"])
+            except ValueError as exc:
+                messagebox.showwarning(APP_NAME, f"Дни: {exc}. Пример: «каждый день», «будни», «пн, ср, пт», «вс».",
+                                       parent=self)
+                return False
+            items = [x.strip(" -•\t") for x in v["items"].splitlines() if x.strip(" -•\t")]
+            if not items:
+                messagebox.showwarning(APP_NAME, "Нужен хотя бы один пункт.", parent=self)
+                return False
+            fields = {"title": v["title"], "when": whens.get(v["when"], "any"), "days": days, "items": items,
+                      "on": v["on"]}
+            if c:
+                c.update(fields)
+            else:
+                fields["id"] = _sid()
+                sysm.s["checklists"].append(fields)
+            self._sys_changed("Боевой лист сохранён")
+
+        def delete():
+            if not messagebox.askyesno(APP_NAME, f"Удалить лист «{c.get('title')}»? Отметки прошлых дней пропадут.",
+                                       parent=self):
+                return False
+            sysm.s["checklists"].remove(c)
+            for run in sysm.s["check_runs"].values():
+                run.pop(c["id"], None)
+            self._sys_changed("Лист удалён")
+        FormDialog(self, "Боевой лист", [
+            {"key": "title", "label": "Название", "value": cc.get("title", ""), "required": True},
+            {"key": "when", "label": "Когда", "kind": "combo", "options": list(CHECK_WHEN.values()),
+             "value": CHECK_WHEN.get(cc.get("when"), CHECK_WHEN["any"]),
+             "hint": "утро — показывается на построении, вечер — в сводке, перед штурмом — в начале первого штурма"},
+            {"key": "days", "label": "Дни", "value": fmt_weekdays(cc.get("days") or list(range(7))),
+             "hint": "«каждый день», «будни», «выходные», «пн, ср, пт», «пн-пт»"},
+            {"key": "items", "label": "Пункты", "kind": "text", "value": "\n".join(cc.get("items") or []), "height": 8,
+             "hint": "по одному в строке: короткое действие, которое можно проверить"},
+            {"key": "on", "label": "Действует", "kind": "check", "value": cc.get("on", True)},
+        ], save, on_delete=delete if c else None, width=50)
+
+    def check_toggle(self, day, checklist, i, on, quiet=False):
+        sysm = self.system
+        before = sysm.check_done(day, checklist)
+        sysm.check_set(day, checklist["id"], i, on)
+        self.store.save()
+        if not before and sysm.check_done(day, checklist):
+            streak = sysm.checks_streak(checklist["id"], self.today())
+            self.toast(f"Лист «{checklist['title']}» закрыт. +5 опыта" + (f", серия {streak}" if streak > 1 else ""),
+                       ms=5000)
+        if not quiet and self.current_view == "system":
+            self.refresh_all()
+
+    # --- 10.0: физподготовка ---
+    def fit_test(self, only=None):
+        self._ensure_main()
+        if not self.system.norms() and only is None:
+            self.toast("Нормативов нет: добавь первый — «Новый норматив»")
+            return
+        FitTestDialog(self, only)
+
+    def fit_save(self, d, vals, note=""):
+        sysm = self.system
+        before = {n["id"]: sysm.fit_best(n) for n, _v in vals}
+        lines, records = [], []
+        for n, value in vals:
+            sysm.fit_add(n["id"], d, value, note)
+            g = fit_grade(n, value)
+            best = before.get(n["id"])
+            if best is not None and n.get("better") in ("more", "less") and (
+                    value > best["value"] if n["better"] == "more" else value < best["value"]):
+                records.append(n["name"])
+            lines.append(f"{n['name']} {fmt_fit_value(n['kind'], value)}" + (f" — {FIT_GRADES[g]}" if g is not None
+                                                                              else ""))
+        sysm.journal_add("fitness", f"{d:%d.%m}: " + "; ".join(lines))
+        self._sys_changed()
+        self.toast("Замеры приняты: " + "; ".join(lines[:4]) + (". Рекорд: " + ", ".join(records) if records else "")
+                   + ". +20 опыта за день проверки.", ms=10000)
+
+    def fit_delete(self, t):
+        if messagebox.askyesno(APP_NAME, "Удалить замер?", parent=self):
+            self.system.fit()["tests"].remove(t)
+            self._sys_changed("Замер удалён")
+
+    def edit_norm(self, n):
+        sysm = self.system
+        nn = n or {"kind": "count", "better": "more", "grades": []}
+        kinds = {v: k for k, v in FIT_KINDS.items()}
+        betters = {v: k for k, v in FIT_BETTER.items()}
+        grades = nn.get("grades") or []
+
+        def save(v):
+            kind, better = kinds[v["kind"]], betters[v["better"]]
+            g = []
+            if better != "none":
+                raw = [v["g1"], v["g2"], v["g3"]]
+                if any(raw):
+                    try:
+                        g = [parse_fit_value(kind, x) for x in raw]
+                    except ValueError as exc:
+                        messagebox.showwarning(APP_NAME, f"Пороги: {exc}. Нужны все три: удовл., хорошо, отлично.",
+                                               parent=self)
+                        return False
+                    ordered = g == sorted(g) if better == "more" else g == sorted(g, reverse=True)
+                    if not ordered:
+                        messagebox.showwarning(APP_NAME, "Пороги идут по возрастанию строгости: удовл. → хорошо → "
+                                                         "отлично.", parent=self)
+                        return False
+            fields = {"name": v["name"], "kind": kind, "unit": v["unit"], "better": better, "grades": g, "on": v["on"]}
+            if n:
+                n.update(fields)
+            else:
+                fields["id"] = _sid()
+                sysm.fit()["norms"].append(fields)
+            sysm.fit()["every"] = v["every"]
+            self._sys_changed("Норматив сохранён")
+
+        def delete():
+            if not messagebox.askyesno(APP_NAME, f"Удалить «{n['name']}» вместе с замерами?", parent=self):
+                return False
+            sysm.fit()["norms"].remove(n)
+            sysm.fit()["tests"] = [t for t in sysm.fit()["tests"] if t.get("norm") != n["id"]]
+            self._sys_changed("Норматив удалён")
+        kind = nn.get("kind", "count")
+        FormDialog(self, "Норматив", [
+            {"key": "name", "label": "Название", "value": nn.get("name", ""), "required": True},
+            {"key": "kind", "label": "Значение", "kind": "combo", "options": list(FIT_KINDS.values()),
+             "value": FIT_KINDS.get(kind)},
+            {"key": "unit", "label": "Единица", "value": nn.get("unit", ""), "width": 12},
+            {"key": "better", "label": "Что лучше", "kind": "combo", "options": list(FIT_BETTER.values()),
+             "value": FIT_BETTER.get(nn.get("better", "more"))},
+            {"key": "g1", "label": "Удовл.", "value": fmt_fit_value(kind, grades[0]) if len(grades) == 3 else "",
+             "width": 10},
+            {"key": "g2", "label": "Хорошо", "value": fmt_fit_value(kind, grades[1]) if len(grades) == 3 else "",
+             "width": 10},
+            {"key": "g3", "label": "Отлично", "value": fmt_fit_value(kind, grades[2]) if len(grades) == 3 else "",
+             "width": 10, "hint": "бег — «3:45»; пусто — без оценки"},
+            {"key": "on", "label": "В проверке", "kind": "check", "value": nn.get("on", True)},
+            {"key": "every", "label": "Проверка раз в, дней", "kind": "int", "value": sysm.fit().get("every", 30),
+             "lo": 0, "hi": 365, "hint": "общее для всех нормативов; 0 — не напоминать"},
+        ], save, on_delete=delete if n else None, width=30)
+
+    # --- 10.0: казна ---
+    def money_record(self, d, amount, cat, note="", impulse=False, kind="out", source=None):
+        sysm = self.system
+        e = sysm.money_add(d, amount, cat, note, impulse, kind, source)
+        self.store.save()
+        self.refresh_all()
+        cur = sysm.money_cur()
+        if kind == "in":
+            self.toast(f"Доход {fmt_money(amount, cur)} записан", ms=5000)
+            return e
+        mm = sysm.money_month(self.today())
+        tail = ""
+        if mm["limit"]:
+            tail = (f". Осталось на месяц {fmt_money(mm['left'], cur)}, в день — {fmt_money(max(0, mm['per_day']), cur)}"
+                    if mm["left"] >= 0 else f". Перерасход месяца {fmt_money(-mm['left'], cur)}")
+        self.toast(f"−{fmt_money(amount, cur)} · {cat}" + (f" · {note}" if note else "") + (" · импульс" if impulse else "")
+                   + tail, self.undo_money, "Отменить", ms=8000)
+        return e
+
+    def undo_money(self):
+        entries = self.system.money()["entries"]
+        if entries:
+            entries.pop()
+            self.system.invalidate()
+            self._commit("Запись убрана")
+
+    def money_delete(self, ids):
+        m = self.system.money()
+        if not messagebox.askyesno(APP_NAME, f"Удалить записей: {len(ids)}?", parent=self):
+            return
+        m["entries"] = [e for e in m["entries"] if e["id"] not in ids]
+        self._sys_changed("Удалено")
+
+    def edit_money(self, e, kind="out"):
+        sysm = self.system
+        ee = e or {"date": self.today().isoformat(), "kind": kind, "cat": MONEY_IN_CAT if kind == "in" else ""}
+        kind = ee.get("kind", kind)
+        cats = sysm.money_cats() + ([MONEY_IN_CAT] if kind == "in" else [])
+
+        def save(v):
+            try:
+                amount = parse_money(v["sum"])
+            except ValueError:
+                messagebox.showwarning(APP_NAME, "Сумма — число больше нуля: 350, 1250,50, 1,2к.", parent=self)
+                return False
+            if e:
+                e.update(date=v["date"], sum=amount, cat=v["cat"] or "Прочее", note=v["note"], impulse=v["impulse"])
+                self._sys_changed("Запись изменена")
+            else:
+                self.money_record(sys_date(v["date"]), amount, v["cat"] or "Прочее", v["note"], v["impulse"], kind)
+
+        def delete():
+            sysm.money()["entries"].remove(e)
+            self._sys_changed("Удалено")
+        FormDialog(self, "Доход" if kind == "in" else "Трата", [
+            {"key": "date", "label": "Дата", "kind": "date", "value": ee.get("date"), "required": True},
+            {"key": "sum", "label": "Сумма", "value": fmt_plain(ee.get("sum")) if ee.get("sum") else "",
+             "required": True, "width": 12},
+            {"key": "cat", "label": "Категория", "kind": "combo", "options": cats, "free": True,
+             "value": ee.get("cat") or (cats[0] if cats else "")},
+            {"key": "note", "label": "Заметка", "value": ee.get("note", "")},
+            {"key": "impulse", "label": "Импульсная покупка — не планировал", "kind": "check",
+             "value": ee.get("impulse", False)},
+        ], save, on_delete=delete if e else None, width=36)
+
+    def money_limits(self):
+        sysm = self.system
+        m = sysm.money()
+        lines = "\n".join(f"{c['name']} = {fmt_plain(c['limit'])}" if c["limit"] else c["name"] for c in m["cats"])
+
+        def save(v):
+            cats = []
+            for line in v["cats"].splitlines():
+                name, sep, lim = line.partition("=")
+                name = name.strip()
+                if not name:
+                    continue
+                try:
+                    limit = parse_money(lim) if sep and lim.strip() and lim.strip() != "0" else 0.0
+                except ValueError:
+                    messagebox.showwarning(APP_NAME, f"Не понял лимит в строке «{line}».", parent=self)
+                    return False
+                if name not in [c["name"] for c in cats]:
+                    cats.append({"name": name, "limit": limit})
+            if not cats:
+                messagebox.showwarning(APP_NAME, "Нужна хотя бы одна категория.", parent=self)
+                return False
+            m.update(cats=cats, month_limit=v["month"] or 0, currency=v["currency"] or "₽", cooldown=v["cooldown"],
+                     on=True)
+            self._sys_changed("Лимиты приняты")
+        FormDialog(self, "Казна: лимиты", [
+            {"key": "month", "label": "Лимит на месяц", "kind": "float", "value": m.get("month_limit") or 0, "lo": 0,
+             "hi": 10_000_000, "step": 1000, "width": 12,
+             "hint": "0 — сумма лимитов категорий; если и они пустые — без лимита"},
+            {"key": "cats", "label": "Категории", "kind": "text", "value": lines, "height": 12,
+             "hint": "по одной в строке; лимит на месяц через «=»: «Кафе и доставка = 6000»"},
+            {"key": "cooldown", "label": "Правило желаний, часов", "kind": "int", "value": m.get("cooldown", 48),
+             "lo": 0, "hi": 720},
+            {"key": "currency", "label": "Валюта", "value": m.get("currency") or "₽", "width": 6},
+        ], save, width=40)
+
+    def edit_wish(self, w):
+        sysm = self.system
+        ww = w or {}
+
+        def save(v):
+            try:
+                price = parse_money(v["price"]) if v["price"] else 0.0
+            except ValueError:
+                messagebox.showwarning(APP_NAME, "Цена — число.", parent=self)
+                return False
+            fields = {"title": v["title"], "price": price, "note": v["note"]}
+            if w:
+                w.update(fields)
+            else:
+                fields.update(id=_sid(), status="wait", added=PLATFORM["now"]().isoformat(timespec="minutes"))
+                sysm.money()["wishes"].append(fields)
+            self._sys_changed(f"В списке желаний: решение через {int(sysm.money().get('cooldown') or 0)} ч")
+        FormDialog(self, "Список желаний", [
+            {"key": "title", "label": "Что хочется", "value": ww.get("title", ""), "required": True},
+            {"key": "price", "label": "Цена", "value": fmt_plain(ww.get("price")) if ww.get("price") else "", "width": 12},
+            {"key": "note", "label": "Зачем", "value": ww.get("note", "")},
+        ], save, width=36)
+
+    def wish_set(self, w, status):
+        sysm = self.system
+        w["status"] = status
+        w["decided"] = PLATFORM["now"]().isoformat(timespec="minutes")
+        if status == "bought" and w.get("price"):
+            sysm.money_add(self.today(), w["price"], "Прочее", f"из списка желаний: {w['title']}")
+            self._sys_changed(f"Куплено осознанно: {w['title']}. Трата записана — поправь категорию, если нужно")
+        elif status == "dropped":
+            self._sys_changed(f"Отказался: {w['title']}. Сэкономлено {fmt_money(w.get('price') or 0, sysm.money_cur())}")
+        else:
+            self._sys_changed()
+
+    # --- 10.0: итоговый разбор и смена кампании ---
+    def final_review(self, then=None):
+        """Итоговый разбор кампании по армейскому формату. then — что открыть после сохранения."""
+        sysm = self.system
+        today = self.today()
+        rev = sysm.s.get("final_review") or {}
+        sm = sysm.campaign_summary(today)
+        facts = (f"{sm['name']}: часы {fmt_h(sm['hours'])} из {fmt_h(sm['goal_hours'])} (по норме к сегодня "
+                 f"{fmt_h(sm['plan_hours'])}), засчитано дней {sm['good_days']} из {sm['days']}, лучшая серия "
+                 f"{sm['best_streak']}, сводок {sm['checkins']}, тренировок {sm['trainings']}. Звание: {sm['rank']}, "
+                 f"штрафы −{sm['penalty']}, нарядов выполнено {sm['duties_done']}, провалено {sm['duties_failed']}.")
+
+        def save(v):
+            sysm.s["final_review"] = v
+            sysm.journal_add("campaign", "итоговый разбор кампании записан")
+            self._sys_changed("Итоговый разбор принят")
+            if then:
+                self.after(150, then)
+        FormDialog(self, f"Итоговый разбор: {sm['name']}", [
+            {"key": "plan", "label": "Что планировали", "kind": "text", "value": rev.get("plan", ""), "height": 3},
+            {"key": "fact", "label": "Что вышло", "kind": "text", "value": rev.get("fact", ""), "height": 3},
+            {"key": "why", "label": "Почему разошлось", "kind": "text", "value": rev.get("why", ""), "height": 3},
+            {"key": "keep", "label": "Что сохранить", "kind": "text", "value": rev.get("keep", ""), "height": 3},
+            {"key": "change", "label": "Что меняю", "kind": "text", "value": rev.get("change", ""), "height": 3,
+             "required": True, "hint": "в следующей кампании: два-три изменения, не больше"},
+        ], save, note=facts + " Разбор уйдёт в послужной список вместе с цифрами.", width=60)
+
+    def new_campaign(self):
+        sysm = self.system
+        today = self.today()
+        if not (sysm.s.get("final_review") or {}).get("change") and today >= sysm.start():
+            if messagebox.askyesno(APP_NAME, "Сначала итоговый разбор текущей кампании: что планировали, что вышло, "
+                                             "почему, что сохранить и что меняю. Провести сейчас?", parent=self):
+                self.final_review(then=self.new_campaign)
+                return
+        start = max(today, sysm.end() + timedelta(days=1))
+        end = start + timedelta(days=89)
+        weekly = sysm.s["weekday_types"]
+        plan = sum(sysm.type_hours(weekly[d.weekday()]) for d in sysm.dates(start, end))
+        hours = max(10, int(round(plan * 0.95 / 10.0)) * 10)
+        nxt = sysm.s.get("next_campaign") or {}
+
+        def save(v):
+            st, en = date.fromisoformat(v["start"]), date.fromisoformat(v["end"])
+            if en < st:
+                messagebox.showwarning(APP_NAME, "Финиш раньше старта.", parent=self)
+                return False
+            plan_args = dict(name=v["name"].strip(), start=st, end=en, hours=v["hours"], reserve=v["reserve"],
+                             carry_xp=v["carry"], phase=v["phase"].strip() or "Развёртывание", focus=v["focus"],
+                             reset_rules_text=v["reset_text"])
+            if today <= sysm.end() and st > today:
+                sysm.schedule_campaign(**plan_args)
+                self._sys_changed(f"«{plan_args['name']}» начнётся {st:%d.%m.%Y}: до тех пор идёт {sysm.name()}")
+                return None
+            if today <= sysm.end() and not messagebox.askyesno(
+                    APP_NAME, f"{sysm.name()} идёт до {sysm.end():%d.%m.%Y}. Свернуть её досрочно и развернуть "
+                              f"«{plan_args['name']}» с {st:%d.%m.%Y}?", parent=self):
+                return False
+            try:
+                self.store.backup_now(f"data-before-campaign-{today:%Y%m%d}.json")
+            except OSError:
+                pass
+            sysm.s["next_campaign"] = {}
+            summary = sysm.start_campaign(today, **plan_args)
+            self._sys_changed()
+            self.views["system"].set_tab("plan")
+            self.toast(f"Развёрнута «{plan_args['name']}». Итоги «{summary['name']}» — в послужном списке, опыт — "
+                       "в выслуге. Проверь этапы и бюджет направлений.", ms=15000)
+        days = (end - start).days + 1
+        FormDialog(self, "Новая кампания", [
+            {"key": "name", "label": "Название", "value": nxt.get("name") or f"Кампания-{days}", "required": True},
+            {"key": "start", "label": "Старт", "kind": "date", "value": nxt.get("start") or start.isoformat(),
+             "required": True},
+            {"key": "end", "label": "Финиш", "kind": "date", "value": nxt.get("end") or end.isoformat(), "required": True},
+            {"key": "hours", "label": "Цель, часов", "kind": "int", "value": nxt.get("hours") or hours, "lo": 1,
+             "hi": 5000, "hint": f"по нынешним режимам дня на 90 дней выходит около {fmt_h(plan)} ч"},
+            {"key": "reserve", "label": "Резерв Ставки, дней", "kind": "int",
+             "value": nxt.get("reserve", sysm.reserve_cfg().get("base")), "lo": 0, "hi": 60},
+            {"key": "phase", "label": "Первый этап", "value": nxt.get("phase") or "Развёртывание"},
+            {"key": "focus", "label": "Фокус этапа", "kind": "text", "value": nxt.get("focus") or "", "height": 3},
+            {"key": "carry", "label": "Опыт текущей кампании — в выслугу (звание сохраняется)", "kind": "check",
+             "value": nxt.get("carry_xp", True)},
+            {"key": "reset_text", "label": "Текст Устава — стандартный (свой текст сбросится)", "kind": "check",
+             "value": nxt.get("reset_rules_text", False)},
+        ], save, ok_text="Развернуть", width=40,
+            note="Направления, режимы дня, расписание, курсы, привычки, правила и все данные остаются. Бюджет "
+                 "направлений переносится с текущего этапа. Если старт позже сегодняшнего дня, а текущая кампания "
+                 "ещё идёт, новая развернётся сама в день старта.")
+
+    def cancel_next_campaign(self):
+        nxt = self.system.s.get("next_campaign") or {}
+        if nxt and messagebox.askyesno(APP_NAME, f"Отменить запланированную «{nxt.get('name')}»?", parent=self):
+            self.system.s["next_campaign"] = {}
+            self._sys_changed("Следующая кампания отменена")
 
     def claude_pack(self, kind="week"):
         """Markdown-пакет для разбора с Claude: цифры, дни, направления, наряды, журнал, прогноз и вопросы."""
@@ -22890,7 +26074,8 @@ class App(tk.Tk):
         r = sysm.rank(today)
         g = sysm.s["goals"]
         out = [f"# Генштаб: пакет для разбора — {title}", "",
-               "Я веду личную кампанию в программе «Генштаб»: 85 дней до Нового года (08.10–31.12.2026), "
+               f"Я веду личную кампанию в программе «Генштаб»: {sysm.name()}, {sysm.total_days()} "
+               f"{plural(sysm.total_days(), DAY_FORMS)} ({sysm.start():%d.%m}–{sysm.end():%d.%m.%Y}), "
                f"цель — {int(sysm.goal('hours', 750))} сфокусированных часов, оценки не ниже "
                f"{fmt_h(g.get('grade_min'))} и в среднем {fmt_h(g.get('grade_avg'))}, тренировки "
                f"{fmt_h(g.get('trainings'))} в неделю, сон от {fmt_h(g.get('sleep'))} ч, подъём {g.get('wake')}. "
@@ -22898,7 +26083,8 @@ class App(tk.Tk):
                "## Положение", "",
                f"- {sysm.campaign_line(today)}; этап «{(sysm.phase_at(min(max(today, sysm.start()), sysm.end())) or {}).get('name', '—')}»",
                f"- часы в кампании: {fmt_h(sysm.hours_total())} из {int(sysm.goal('hours', 750))}",
-               f"- звание: {r['name']}, опыт {r['xp']} (штрафы −{r['gross'] - r['xp']})",
+               f"- звание: {r['name']}, опыт {r['xp']} (штрафы −{r['pen']}" + (f", выслуга {r['carry']}" if r["carry"] else "")
+               + ")",
                f"- резерв: {sysm.reserve_left(today)} из {sysm.reserve_total(today)}; нарядов открыто "
                f"{len(sysm.duties_open())}; долг по переносам {fmt_h(sysm.carry_debt(today))} ч", ""]
         out += ["## Дни", "", "| Дата | Режим | Норма | Факт | Боеготовность | Сон | Подъём | Тренировка | Питание | "
@@ -22950,6 +26136,15 @@ class App(tk.Tk):
                                    ("good", "Что сохранить"), ("bad", "Что сломалось"), ("change", "Что меняю")):
                     if rev.get(key):
                         out.append(f"- {label}: {rev[key]}")
+        kit = sysm.kit_report_lines(a, b)
+        if kit:
+            out += ["", "## Дисциплина и тыл: ПВО, боевые листы, казна, физподготовка", ""] + [f"- {x}" for x in kit]
+            st = sysm.urge_stats(a, b)
+            if st["kinds"]:
+                out.append("- соблазны: " + "; ".join(f"{k} — {v[0]} (устоял {v[1]}, сорвался {v[2]})"
+                                                       for k, v in st["kinds"][:6]))
+                top_h = sorted(range(24), key=lambda h: -st["hours"][h])[:3]
+                out.append("- чаще всего атакует в " + ", ".join(f"{h:02d}:00" for h in top_h if st["hours"][h]))
         out += ["", "## Разведсводка", "", sysm.intel_text(today), "",
                 "## Инсайты программы", ""] + [f"- {x}" for x in sysm.insights(today)]
         out += ["", "## Вопросы", "",
