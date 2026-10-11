@@ -61,7 +61,7 @@ from xml.sax.saxutils import escape as xml_escape
 APP_NAME = "Генштаб"
 APP_ID = "genshtab"
 BUNDLE_ID = "local.genshtab.app"
-VERSION = "9.0"
+VERSION = "10.0"
 FROZEN = bool(getattr(sys, "frozen", False))
 SCRIPT_PATH = Path(sys.executable if FROZEN else __file__).resolve()
 DATA_FILE = Path(os.environ.get("GENSHTAB_DATA") or os.environ.get("TEMPO_DATA")
@@ -4673,6 +4673,7 @@ class HelpDialog(tk.Toplevel):
   ПВО                перехваты соблазнов: что тянет, сила 1–5, удержание, итог; откуда и когда атакует
   Протоколы          «если — то»: решения, принятые заранее; показываются в перехвате и на построении
   Боевые листы       чек-листы по дням: утренний осмотр, перед штурмом, вечерняя поверка, тыловой день
+  Сигналы            напоминания на время, с повтором; звучат и на паузе дежурного, дублируются в Telegram
 
 Тыл
   Физподготовка      нормативы с порогами «удовл. — хорошо — отлично», замеры, рекорды, график
@@ -4734,6 +4735,7 @@ class HelpDialog(tk.Toplevel):
   перехват ютуб 4    соблазн на перехвате; устоял · сорвался — итог последнего
   трата 350 кафе     трата (в конце «!» — импульс); доход 5000
   вес 73,5           замер веса; норматив подтягивания 14 — любой норматив
+  напомни 18:00 …    сигнал на время; напомни завтра 9:30 … · через 40 мин … · по будням 21:30 …
   Сокращения направлений — Ставка → Дежурный → Списки
 
 Только в Telegram
@@ -4741,7 +4743,7 @@ class HelpDialog(tk.Toplevel):
   сводка сон 7 подъём 7:05 трен сила еда 4 энергия 4 итог: …   вечерняя сводка целиком
   приказ · статус · разведка · звание · наряды · разбор: текст · дело
   резерв · резерв завтра причина · перенос 2 причина · отчёт · неделя · отмена · /help
-  пво · листы · лист осмотр всё · протоколы · казна · физо
+  пво · листы · лист осмотр всё · протоколы · казна · физо · сигналы
 
 Связка с другими программами
   status.json        в папке данных: идёт ли штурм, по чему и до скольки — для блокировщика
@@ -6504,7 +6506,7 @@ class ReviewDialog(tk.Toplevel):
                        if sysm.quota() else "")
                     + f"тренировок {sysm.trainings_between(a, b)} из "
                     f"{int(sysm.goal('trainings', 6))}, сон {fmt_num(sum(sl) / len(sl)) if sl else '—'} ч, "
-                    f"питание {fmt_num(sum(fd) / len(fd)) if fd else '—'} из 5.")
+                    f"питание {fmt_num(sum(fd) / len(fd)) if fd else '—'} из {len(sysm.food_rules())}.")
             fact = sysm.hours_by_project(a, b)
             gaps = sorted(((sysm.budget_between(p, a, week_end) - fact.get(p, 0.0), p) for p in sysm.directions()
                            if p), reverse=True)
@@ -6513,6 +6515,10 @@ class ReviewDialog(tk.Toplevel):
                 text += " Недобор к бюджету недели: " + ", ".join(gaps) + " ч."
             tk.Label(body, text=text, font=F["ui"], bg=C.BG, fg=C.INK, anchor="w", justify="left",
                      wraplength=px(640)).pack(fill="x")
+            kit = sysm.kit_report_lines(a, b)
+            if kit:
+                tk.Label(body, text=". ".join(kit) + ".", font=F["ui"], bg=C.BG, fg=C.INK, anchor="w", justify="left",
+                         wraplength=px(640)).pack(fill="x", pady=(px(2), 0))
             rev = sysm.s["reviews"].get(self.monday.isoformat()) or {}
             pr = sysm.promise(self.monday)
             planned = (f"обязательство {fmt_h(pr['hours'])} ч" if pr.get("hours") else f"норма {fmt_h(hp)} ч")
@@ -7243,7 +7249,7 @@ JOURNAL_KINDS = {"snooze": "отложил", "skip": "пропустил", "afte
                  "phone": "с телефона", "minimize": "свернул окно", "auto": "автохронометраж",
                  "reserve": "резерв Ставки", "carry": "перенос нормы", "duty": "наряд", "retreat": "отступление",
                  "alarm": "тревога", "rank": "звание", "noresult": "штурм без результата", "defense": "оборона",
-                 "campaign": "кампания", "urge": "ПВО", "fitness": "физподготовка"}
+                 "campaign": "кампания", "urge": "ПВО", "fitness": "физподготовка", "signal": "сигнал"}
 
 
 # Короткие имена направлений для ввода с телефона: «+1,5 эконом», «старт мл».
@@ -7399,6 +7405,64 @@ SYS_NORMS = [
 MONEY_CATS = ["Продукты", "Кафе и доставка", "Транспорт", "Связь и подписки", "Учёба и книги", "Спорт и здоровье",
               "Одежда", "Развлечения", "Подарки", "Прочее"]
 MONEY_IN_CAT = "Доход"
+SIGNAL_REPEAT = {None: "один раз", "day": "каждый день", "wd": "по будням", "week": "раз в неделю"}
+
+
+def parse_dt(value):
+    try:
+        return datetime.fromisoformat(str(value)) if value else None
+    except ValueError:
+        return None
+
+
+def parse_signal(text, now, today):
+    """«18:00 забрать посылку», «завтра 9:30 позвонить», «через 40 мин встать», «пт 10:00 …», «каждый день 21:30 …»
+    → (момент, текст, повтор). Ошибка — ValueError."""
+    t = (text or "").strip()
+    repeat = None
+    m = re.match(r"(каждый день|ежедневно|по будням|каждую неделю|еженедельно)\s+(.*)$", t, flags=re.IGNORECASE | re.S)
+    if m:
+        repeat = {"каждый день": "day", "ежедневно": "day", "по будням": "wd", "каждую неделю": "week",
+                  "еженедельно": "week"}[m[1].lower()]
+        t = m[2].strip()
+    m = re.match(r"через\s+(\d+(?:[.,]\d+)?)\s*(м|мин|минут[уы]?|ч|час[аов]*)\.?\s+(.+)$", t, flags=re.IGNORECASE | re.S)
+    if m:
+        n = float(m[1].replace(",", "."))
+        delta = timedelta(hours=n) if m[2].lower().startswith("ч") else timedelta(minutes=n)
+        if delta.total_seconds() < 60:
+            raise ValueError("слишком скоро")
+        return (now + delta).replace(second=0, microsecond=0), m[3].strip(), repeat
+    day = today
+    first, _sp, rest = t.partition(" ")
+    second = rest.split(" ", 1)[0] if rest else ""
+    if not parse_hm(first) or parse_hm(second):
+        try:
+            d = parse_date(first, today)
+        except ValueError:
+            d = None
+        if d is None:
+            raise ValueError("нужно время: «18:00 текст», «завтра 9:30 текст» или «через 40 мин текст»")
+        day = d
+        first, _sp, rest = rest.strip().partition(" ")
+    hm = parse_hm(first)
+    if not hm or not rest.strip():
+        raise ValueError("нужно время и текст: «18:00 забрать посылку»")
+    at = datetime(day.year, day.month, day.day, hm[0], hm[1])
+    if at <= now:
+        if day != today:
+            raise ValueError("это время уже прошло")
+        at += timedelta(days=1)
+    while repeat == "wd" and at.weekday() >= 5:
+        at += timedelta(days=1)
+    return at, rest.strip(), repeat
+
+
+def next_signal(at, repeat):
+    nxt = at + timedelta(days=7 if repeat == "week" else 1)
+    if repeat == "wd":
+        while nxt.weekday() >= 5:
+            nxt += timedelta(days=1)
+    return nxt
 WISH_STATUS = {"wait": "ждёт решения", "bought": "куплено", "dropped": "отказался"}
 
 
@@ -7476,9 +7540,12 @@ def parse_fit_value(kind, text):
             if int(m[2]) > 59:
                 raise ValueError("секунд больше 59")
             return int(m[1]) * 60 + int(m[2]) + (int(m[3]) / 10 if m[3] else 0)
-        m = re.fullmatch(r"(\d+(?:\.\d+)?)(?:м|мин|min)?", t)
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)(м|мин|min|с|сек|s)?", t)
         if m:
-            return float(m[1]) * 60
+            # «14» или «14м» — минуты, «225» или «225с» — секунды
+            v = float(m[1])
+            secs = m[2] in ("с", "сек", "s") or (m[2] is None and v >= 60)
+            return v if secs else v * 60
         raise ValueError("время в виде 3:45")
     if kind == "sec":
         m = re.fullmatch(r"(\d+):(\d{2})", t)
@@ -7611,6 +7678,7 @@ def sys_defaults():
         "fitness": fitness_defaults(),
         "money": money_defaults(),
         "next_campaign": {},
+        "signals": [],
     }
 
 
@@ -7700,6 +7768,14 @@ def normalize_kit(out, base):
     except (TypeError, ValueError):
         out["xp_carry"] = 0
     out["campaigns"] = [c for c in out["campaigns"] if isinstance(c, dict)]
+    sigs = []
+    for x in out.get("signals") or []:
+        if isinstance(x, dict) and x.get("text") and parse_dt(x.get("at")):
+            x.setdefault("id", _sid())
+            if x.get("repeat") not in SIGNAL_REPEAT:
+                x["repeat"] = None
+            sigs.append(x)
+    out["signals"] = sigs[-500:]
     nxt = out.get("next_campaign") if isinstance(out.get("next_campaign"), dict) else {}
     out["next_campaign"] = nxt if sys_date(nxt.get("start")) and sys_date(nxt.get("end")) else {}
     out["urges"] = [u for u in out["urges"] if isinstance(u, dict) and u.get("ts")][-2000:]
@@ -9247,6 +9323,40 @@ class KitMixin:
         if r["next"]:
             lines.append(f"До звания «{r['next']}»: {r['hi'] - r['xp']} очков")
         return "\n".join(lines)
+
+    # --- сигналы: напоминания на время ---
+    def signals(self, pending=True):
+        out = [x for x in self.s["signals"] if not pending or not x.get("done")]
+        return sorted(out, key=lambda x: x["at"])
+
+    def signal_add(self, at, text, repeat=None, source=None):
+        x = {"id": _sid(), "at": at.isoformat(timespec="minutes"), "text": text.strip()[:200], "repeat": repeat,
+             "done": False}
+        if source:
+            x["src"] = source
+        self.s["signals"].append(x)
+        self.invalidate()
+        return x
+
+    def signal_fire(self, x, now=None):
+        """Сигнал прозвучал: разовый — закрыт, повторяющийся — переносится на следующий раз."""
+        now = now or PLATFORM["now"]()
+        if x.get("repeat"):
+            at = parse_dt(x["at"]) or now
+            while at <= now:
+                at = next_signal(at, x["repeat"])
+            x["at"] = at.isoformat(timespec="minutes")
+        else:
+            x["done"] = True
+        done = [s for s in self.s["signals"] if s.get("done")]
+        if len(done) > 100:
+            drop = {s["id"] for s in done[:-100]}
+            self.s["signals"] = [s for s in self.s["signals"] if s["id"] not in drop]
+        self.invalidate()
+
+    def signals_due(self, now=None):
+        now = now or PLATFORM["now"]()
+        return [x for x in self.signals() if (parse_dt(x["at"]) or now) <= now]
 
     # --- опыт за дисциплину вне часов ---
     def kit_xp(self, a, b):
@@ -13083,7 +13193,7 @@ BOT_HELP = """Генштаб на связи. Пиши сюда факты — �
   касание Иван созвон · день марш · день оборона
 
 Кампания
-  приказ — приказ на сегодня · статус · разведка — прогноз до 31.12 · звание
+  приказ — приказ на сегодня · статус · разведка — прогноз до финиша кампании · звание
   наряды · разбор: текст от 200 знаков — закрыть письменный разбор
   резерв — сколько осталось · резерв завтра причина — объявить (на сегодня — до 12:00)
   перенос 2 причина — перенести недобор (вечером или до 12:00 следующего дня)
@@ -13096,6 +13206,7 @@ BOT_HELP = """Генштаб на связи. Пиши сюда факты — �
 Дисциплина и тыл
   перехват ютуб 4 — соблазн на перехвате, через 10 минут спрошу итог · устоял · сорвался · пво
   листы — боевые листы на сегодня · лист осмотр всё · лист поверка 1 3 · протоколы
+  напомни 18:00 забрать посылку · напомни завтра 9:30 … · напомни через 40 мин … · сигналы
   трата 350 кафе шаурма (в конце «!» — импульс) · доход 5000 · казна
   вес 73,5 · норматив подтягивания 14 · физо · дело — личное дело
 
@@ -13280,6 +13391,11 @@ class TelegramBot:
             ps = sysm.protocols()
             return "Протоколы «если — то»:\n" + "\n".join(f"• если {lc_first(p['if'])} — {p['then']}"
                                                          for p in ps) if ps else "Протоколов нет."
+        if word in ("сигналы",) and not rest:
+            sig = sysm.signals()
+            return ("Сигналы:\n" + "\n".join(f"• {parse_dt(x['at']):%d.%m %H:%M} {x['text']}"
+                                               + (f" ({SIGNAL_REPEAT[x['repeat']]})" if x.get("repeat") else "")
+                                               for x in sig[:15])) if sig else "Сигналов нет."
         if word in ("дело", "личное", "послужной") and not rest:
             return sysm.dossier_text(app.today())
         results, errors, unknown = [], [], []
@@ -22419,7 +22535,7 @@ class DisciplineView(KitView):
     TITLE = "Дисциплина"
     HINT = ("ПВО — перехват соблазнов: тянет отвлечься — записал, выдержал 10 минут, отметил итог. Протоколы «если — "
             "то» — решения, принятые заранее. Боевые листы — порядок без раздумий. Ctrl+U — перехват из любого раздела.")
-    TABS = [("pvo", "ПВО"), ("protocols", "Протоколы"), ("lists", "Боевые листы")]
+    TABS = [("pvo", "ПВО"), ("protocols", "Протоколы"), ("lists", "Боевые листы"), ("signals", "Сигналы")]
     SETTING = "discipline_tab"
 
     def __init__(self, master, app):
@@ -22429,6 +22545,8 @@ class DisciplineView(KitView):
 
     def buttons(self, head):
         ttk.Button(head, text="Перехват  Ctrl+U", style="Work.TButton", command=self.app.open_urge).pack(side="right")
+        ttk.Button(head, text="Настройки", command=self.app.discipline_settings).pack(side="right",
+                                                                                     padx=(0, self.app.px(6)))
 
     def render(self, today):
         sysm = self.app.system
@@ -22630,6 +22748,39 @@ class DisciplineView(KitView):
                 ui_text(row, app, f"{c['title']} — {fmt_weekdays(c.get('days'))}"
                                   + ("" if c.get("on", True) else ", выключен")
                                   + ("" if c.get("items") else ", пунктов нет")).pack(side="left", fill="x", expand=True)
+
+    # ───────── сигналы ─────────
+    def _tab_signals(self, today):
+        app, sysm = self.app, self.app.system
+        F, px = app.fonts, app.px
+        card = self.card()
+        head = self.h2(card, "Сигналы оповещения")
+        ttk.Button(head, text="Новый сигнал", style="Work.TButton", command=lambda: app.edit_signal(None)).pack(
+            side="right")
+        ui_text(card, app, "Напоминание на время: карточка поверх всех окон и сообщение в Telegram, если он настроен. "
+                           "Быстро — через Ctrl+I или боту: «напомни 18:00 забрать посылку», «напомни завтра 9:30 "
+                           "позвонить», «напомни через 40 мин встать», «напомни по будням 21:30 карточки».",
+                fg=C.INK).pack(fill="x")
+        pending = sysm.signals()
+        if not pending:
+            ui_text(card, app, "Сигналов нет.").pack(fill="x", pady=(px(6), 0))
+        now = PLATFORM["now"]()
+        for x in pending:
+            at = parse_dt(x["at"])
+            row = tk.Frame(card, bg=C.SURFACE)
+            row.pack(fill="x", pady=px(2))
+            ui_link(row, app, "удалить", lambda xx=x: app.signal_delete(xx), fg=C.MUTED).pack(side="right")
+            ui_link(row, app, "изменить", lambda xx=x: app.edit_signal(xx)).pack(side="right", padx=px(8))
+            when = ("сегодня" if at.date() == now.date() else
+                    ("завтра" if at.date() == now.date() + timedelta(days=1) else f"{WD_SHORT[at.weekday()]} {at:%d.%m}"))
+            tk.Label(row, text=f"{when} {at:%H:%M}", font=F["ui_bold"], bg=C.SURFACE, fg=C.INK, width=14,
+                     anchor="w").pack(side="left")
+            ui_text(row, app, x["text"] + (f" · {SIGNAL_REPEAT.get(x.get('repeat'))}" if x.get("repeat") else ""),
+                    fg=C.INK).pack(side="left", fill="x", expand=True)
+        done = [x for x in sysm.signals(False) if x.get("done")][-6:]
+        if done:
+            ui_text(card, app, "Прозвучали: " + "; ".join(f"{parse_dt(x['at']):%d.%m %H:%M} {x['text']}"
+                                                          for x in reversed(done))).pack(fill="x", pady=(px(8), 0))
 
     def _list_day(self, back):
         self.list_back = back
@@ -23102,6 +23253,7 @@ class MoneyView(KitView):
     def buttons(self, head):
         app = self.app
         ttk.Button(head, text="Лимиты", command=app.money_limits).pack(side="right")
+        ttk.Button(head, text="CSV", command=app.export_money).pack(side="right", padx=(0, app.px(6)))
         ttk.Button(head, text="Доход", command=lambda: app.edit_money(None, kind="in")).pack(side="right",
                                                                                          padx=app.px(6))
         ttk.Button(head, text="В список желаний", command=lambda: app.edit_wish(None)).pack(side="right")
@@ -23388,13 +23540,20 @@ class App(tk.Tk):
             self.after(1500, self._offer_update)
         if self.store.fresh and not self.store.tasks and not start_minimized:
             self.after(500, lambda: WelcomeDialog(self))
-        elif self._system_new or self._new_version:
+        elif self._system_new:
             self.store.settings["last_plan_prompt"] = self.today().isoformat()
             note = "Данные Темпа перенесены. " if moved else ""
+            sysm = self.system
             self.after(900, lambda: self.toast(
-                note + "Генштаб 9.0: развёрнута кампания-85 — 08.10–31.12. Утром построение и приказ, в 15:00 и "
-                "19:00 тревоги, вечером сводка, за провал — наряд, на отдых — резерв Ставки. Всё — в «Уставе».",
+                note + f"Развёрнута {sysm.name()} — {sysm.start():%d.%m}–{sysm.end():%d.%m}. Утром построение и приказ, "
+                "в 15:00 и 19:00 тревоги, вечером сводка, за провал — наряд, на отдых — резерв Ставки. Всё — в «Уставе».",
                 lambda: self.views["system"].set_tab("plan"), "Устав", ms=30000))
+        elif self._new_version:
+            self.store.settings["last_plan_prompt"] = self.today().isoformat()
+            self.after(900, lambda: self.toast(
+                f"Генштаб {VERSION}: Дисциплина (ПВО, протоколы, боевые листы), Физподготовка, Казна, Личное дело, "
+                "правила Устава под твоим контролем и новая кампания после финиша.", self.whats_new, "Что нового",
+                ms=30000))
         else:
             self.after(1200, self._day_prompt)
             self.after(2600, self._review_prompt)
@@ -24057,6 +24216,7 @@ class App(tk.Tk):
                 self.after(800, self._day_prompt)
             self._pause_check()
             self._urge_tick()
+            self._signal_tick()
             self.coach.tick()
             self.tray.update()
             while True:
@@ -24505,16 +24665,20 @@ class App(tk.Tk):
                   ("Дисциплина: боевые листы", "", lambda: disc.set_tab("lists")),
                   ("Новый протокол «если — то»", "", lambda: self.edit_protocol(None)),
                   ("Новый боевой лист", "", lambda: self.edit_checklist(None)),
+                  ("Новый сигнал (напоминание на время)", "", lambda: self.edit_signal(None)),
+                  ("Дисциплина: сигналы", "", lambda: disc.set_tab("signals")),
                   ("Сдать нормативы по физподготовке", "", self.fit_test),
                   ("Физподготовка", "", lambda: self._goto("fitness")),
                   ("Казна: записать трату", "", lambda: self.edit_money(None)),
                   ("Казна: список желаний", "", lambda: self.edit_wish(None)),
                   ("Казна: лимиты", "", self.money_limits),
+                  ("Казна в CSV (Excel)", "", self.export_money),
                   ("Казна", "", lambda: self._goto("money")),
                   ("Ставка: личное дело", "", lambda: sysv.set_tab("dossier")),
                   ("Правила дисциплины", "", lambda: sysv._edit_rules()),
                   ("Итоговый разбор кампании", "", lambda: self.final_review()),
-                  ("Новая кампания", "", self.new_campaign)]
+                  ("Новая кампания", "", self.new_campaign),
+                  (f"Что нового в {VERSION}", "", self.whats_new)]
         items += [("Новая задача", "Ctrl+N", self._new_task),
                  ("Спланировать день", "", self.plan_day),
                  ("Добавить задачи списком", "", self.bulk_add),
@@ -25163,6 +25327,54 @@ class App(tk.Tk):
                 system_notification("Вечерняя сводка", "Минута: тип дня, сон, тренировка, питание")
         self.toast("Вечерняя сводка: минута на сон, тренировку и питание", self.checkin, "Заполнить", ms=30000)
 
+    WHATS_NEW = [
+        ("Дисциплина", "Новый раздел. ПВО — перехват соблазнов: Ctrl+U (из любой программы Ctrl+Alt+U), что тянет и "
+                       "насколько сильно, 10 минут удержания, потом честный итог. Видно, что и в какие часы атакует. "
+                       "Протоколы «если — то» — решения, принятые заранее: показываются в перехвате и на построении. "
+                       "Боевые листы — утренний осмотр, перед штурмом, вечерняя поверка, тыловой день; свои — любые."),
+        ("Тыл", "Физподготовка — нормативы с порогами «удовл. — хорошо — отлично», замеры, рекорды и график; "
+                "напоминание раз в месяц. Казна — траты одной строкой («350 кафе шаурма»), лимит месяца, «можно в "
+                "день», дни без трат, импульсные покупки и список желаний с правилом 48 часов."),
+        ("Устав под контролем", "Все правила с цифрами — резерв, перенос, наряды, оборона, когда день засчитан — "
+                                "меняются в «Ставка → Устав → Изменить правила». Текст Устава и название кампании — "
+                                "тоже твои."),
+        ("Новая кампания", "Кампания кончается — «Устав → Новая кампания»: итоговый разбор, итоги — в послужной "
+                           "список, опыт — в выслугу (звание не сбрасывается). Старт можно назначить заранее — "
+                           "развернётся сам."),
+        ("Личное дело", "Новая вкладка Ставки: звание и выслуга, награды, рекорды, взыскания и послужной список."),
+        ("Связь и отчёты", "Боту: «перехват ютуб 4», «устоял», «трата 350 кафе», «вес 73,5», «листы», «пво», "
+                           "«казна», «физо», «дело». Донесения и пакет для Claude видят ПВО, листы, казну и физо. "
+                           "Лишние разделы можно спрятать в «Настройки → Разделы в меню»."),
+        ("Ничего не сломано", "Боеготовность, опыт, штрафы и наряды прошлых дней не пересчитываются: новое начинает "
+                              "считаться с сегодняшнего дня."),
+    ]
+
+    def whats_new(self):
+        self._ensure_main()
+        win = tk.Toplevel(self)
+        F, px = self.fonts, self.px
+        win.title(f"Генштаб {VERSION}: что нового")
+        win.configure(bg=C.BG)
+        win.transient(self)
+        win.resizable(False, False)
+        body = tk.Frame(win, bg=C.BG, padx=px(24), pady=px(18))
+        body.pack(fill="both", expand=True)
+        tk.Label(body, text=f"★ Генштаб {VERSION}", font=F["h1"], bg=C.BG, fg=C.INK).pack(anchor="w")
+        for head, text in self.WHATS_NEW:
+            tk.Label(body, text=head, font=F["ui_bold"], bg=C.BG, fg=C.FOCUS, anchor="w").pack(fill="x",
+                                                                                            pady=(px(10), 0))
+            tk.Label(body, text=text, font=F["ui"], bg=C.BG, fg=C.INK, anchor="w", justify="left",
+                     wraplength=px(620)).pack(fill="x")
+        row = tk.Frame(body, bg=C.BG)
+        row.pack(fill="x", pady=(px(16), 0))
+        ttk.Button(row, text="В Дисциплину", style="Work.TButton",
+                   command=lambda: (win.destroy(), self._goto("discipline"))).pack(side="left")
+        ttk.Button(row, text="Правила Устава", command=lambda: (win.destroy(), self.views["system"].set_tab("plan"))
+                   ).pack(side="left", padx=px(6))
+        ttk.Button(row, text="Закрыть", command=win.destroy).pack(side="right")
+        win.bind("<Escape>", lambda e: win.destroy())
+        dialog_place(win, self, 50)
+
     def _missed_checkin_prompt(self, retry=True):
         sysm, s = self.system, self.store.settings
         today = self.today()
@@ -25351,6 +25563,17 @@ class App(tk.Tk):
         """Строки 10.0: «перехват ютуб 4», «устоял», «трата 350 кафе», «доход 5000», «вес 73,5»,
         «норматив подтягивания 14». (True/False, текст) или None, если это не они."""
         sysm = self.system
+        m = re.fullmatch(r"(?:напомни|сигнал)\s+(.+)", s, flags=re.IGNORECASE | re.S)
+        if m:
+            now = PLATFORM["now"]()
+            try:
+                at, text, repeat = parse_signal(m[1], now, now.date())
+            except ValueError as exc:
+                return False, f"сигнал: {exc}"
+            sysm.signal_add(at, text, repeat, source)
+            self._sys_changed()
+            when = "сегодня" if at.date() == now.date() else f"{WD_SHORT[at.weekday()]} {at:%d.%m}"
+            return True, f"сигнал {when} в {at:%H:%M}: {text}" + (f" ({SIGNAL_REPEAT[repeat]})" if repeat else "")
         m = re.fullmatch(r"(?:перехват|соблазн)\s+(.+)", s, flags=re.IGNORECASE | re.S)
         if m:
             what, power, note = parse_urge(m[1], sysm.urge_kinds())
@@ -25647,6 +25870,107 @@ class App(tk.Tk):
         self.store.save()
         self.refresh_all()
 
+    # --- 10.0: сигналы ---
+    def edit_signal(self, x):
+        sysm = self.system
+        xx = x or {}
+        at = parse_dt(xx.get("at")) or (PLATFORM["now"]() + timedelta(hours=1)).replace(minute=0, second=0,
+                                                                                       microsecond=0)
+        reps = {v: k for k, v in SIGNAL_REPEAT.items()}
+
+        def save(v):
+            d = sys_date(v["date"])
+            hm = parse_hm(v["time"])
+            if not d or not hm:
+                messagebox.showwarning(APP_NAME, "Нужны дата и время.", parent=self)
+                return False
+            when = datetime(d.year, d.month, d.day, hm[0], hm[1])
+            if when <= PLATFORM["now"]() and reps.get(v["repeat"]) is None:
+                messagebox.showwarning(APP_NAME, "Это время уже прошло.", parent=self)
+                return False
+            if x:
+                x.update(at=when.isoformat(timespec="minutes"), text=v["text"], repeat=reps.get(v["repeat"]),
+                         done=False)
+                x.pop("shown", None)
+                sysm.invalidate()
+            else:
+                sysm.signal_add(when, v["text"], reps.get(v["repeat"]))
+            self._sys_changed(f"Сигнал: {when:%d.%m %H:%M} — {v['text']}")
+        FormDialog(self, "Сигнал", [
+            {"key": "text", "label": "Что", "value": xx.get("text", ""), "required": True},
+            {"key": "date", "label": "Дата", "kind": "date", "value": at.date().isoformat(), "required": True},
+            {"key": "time", "label": "Время", "kind": "time", "value": f"{at:%H:%M}"},
+            {"key": "repeat", "label": "Повтор", "kind": "combo", "options": list(SIGNAL_REPEAT.values()),
+             "value": SIGNAL_REPEAT.get(xx.get("repeat"))},
+        ], save, on_delete=(lambda: self.signal_delete(x)) if x else None, width=36)
+
+    def signal_delete(self, x):
+        if x in self.system.s["signals"]:
+            self.system.s["signals"].remove(x)
+            self._sys_changed("Сигнал удалён")
+
+    def _signal_tick(self):
+        """Сигналы звучат и на паузе дежурного: их ставил ты сам."""
+        if time.time() - getattr(self, "_signal_checked", 0) < 5:
+            return
+        self._signal_checked = time.time()
+        sysm, coach = self.system, self.coach
+        now = PLATFORM["now"]()
+        for x in sysm.signals_due(now):
+            at = parse_dt(x["at"]) or now
+            late = (now - at).total_seconds() > 6 * 3600
+            if not late:
+                card = coach.show_card("signal", f"Сигнал: {x['text']}", f"{at:%H:%M}"
+                                       + (f" · {SIGNAL_REPEAT.get(x.get('repeat'))}" if x.get("repeat") else ""),
+                                       [("Принято", None), ("Через 10 минут", lambda xx=x: self._signal_snooze(xx))],
+                                       level=2, timeout=900, priority=4, motivate=False)
+                if card is None:
+                    continue
+                # не notify(): он поднимает главное окно поверх карточки
+                if self.store.settings.get("system_notify") and not self.tray.notify("Сигнал", x["text"]):
+                    system_notification("Сигнал", x["text"])
+                coach.tg_self(f"Генштаб · сигнал {at:%H:%M}: {x['text']}", "bot")
+            sysm.journal_add("signal", f"{at:%d.%m %H:%M} {x['text']}" + (" (пропущен, компьютер был выключен)"
+                                                                          if late else ""))
+            sysm.signal_fire(x, now)
+            self.store.save()
+            if self.current_view == "discipline":
+                self.refresh_all()
+            break
+
+    def _signal_snooze(self, x):
+        self.system.signal_add(PLATFORM["now"]() + timedelta(minutes=10), x["text"])
+        self.store.save()
+
+    def discipline_settings(self):
+        sysm = self.system
+        coach = sysm.coach
+        lists = coach.setdefault("lists", {})
+        w = coach.setdefault("weights", {})
+
+        def save(v):
+            coach.setdefault("urges", {})["hold"] = v["hold"]
+            lists.update(morning=v["morning"], evening=v["evening"], assault=v["assault"])
+            if v["weight"] and not w.get("lists"):
+                coach["lists_since"] = self.today().isoformat()
+            w["lists"] = v["weight"]
+            sysm.invalidate()
+            self._sys_changed("Настройки дисциплины приняты")
+        FormDialog(self, "Дисциплина: настройки", [
+            {"kind": "section", "label": "ПВО"},
+            {"key": "hold", "label": "Удержание, минут", "kind": "int", "value": sysm.urge_hold(), "lo": 1, "hi": 60,
+             "hint": "столько ждать после перехвата, прежде чем спросить итог"},
+            {"kind": "section", "label": "Боевые листы"},
+            {"key": "morning", "label": "Утренние листы — на построении", "kind": "check",
+             "value": lists.get("morning", True)},
+            {"key": "evening", "label": "Вечерние листы — в сводке", "kind": "check", "value": lists.get("evening", True)},
+            {"key": "assault", "label": "Лист «перед штурмом» — карточкой в начале первого штурма за день",
+             "kind": "check", "value": lists.get("assault", False)},
+            {"key": "weight", "label": "Вес листов в боеготовности", "kind": "int", "value": w.get("lists", 0), "lo": 0,
+             "hi": 100, "hint": "0 — не влияют на «засчитан». Считаются с дня, когда дан вес: прошлое не меняется. "
+                                "Для сравнения: часы 50, сводка 10, сон 10"},
+        ], save, width=24)
+
     # --- 10.0: протоколы и боевые листы ---
     def edit_protocol(self, p):
         sysm = self.system
@@ -25887,6 +26211,30 @@ class App(tk.Tk):
             {"key": "impulse", "label": "Импульсная покупка — не планировал", "kind": "check",
              "value": ee.get("impulse", False)},
         ], save, on_delete=delete if e else None, width=36)
+
+    def export_money(self):
+        sysm = self.system
+        entries = sorted(sysm.money()["entries"], key=lambda e: (e["date"], e.get("ts", "")))
+        if not entries:
+            self.toast("В казне ещё нет записей")
+            return
+        path = filedialog.asksaveasfilename(parent=self, defaultextension=".csv",
+                                            initialfile=f"genshtab-money-{self.today():%Y%m%d}.csv",
+                                            filetypes=[("CSV (Excel)", "*.csv")])
+        if not path:
+            return
+        try:
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                w = csv.writer(f, delimiter=";")
+                w.writerow(["Дата", "Вид", "Сумма", "Категория", "Заметка", "Импульс"])
+                for e in entries:
+                    w.writerow([e["date"], "доход" if e.get("kind") == "in" else "трата",
+                                fmt_plain(e["sum"]), e.get("cat") or "", e.get("note") or "",
+                                "да" if e.get("impulse") else ""])
+        except OSError as exc:
+            messagebox.showerror(APP_NAME, f"Не удалось сохранить файл: {exc}", parent=self)
+            return
+        self.toast(f"Казна выгружена: {path}", lambda: open_path(Path(path)), "Открыть", ms=9000)
 
     def money_limits(self):
         sysm = self.system
