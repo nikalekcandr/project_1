@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Генштаб: штаб личной кампании — приказ на день, штурмы, сводки, наряды, резерв и разведка в одном окне.
+Генштаб: штаб личной кампании — приказ на день, штурмы, сводки, наряды, резерв, разведка, дисциплина и тыл
+в одном окне.
 
 Только стандартная библиотека Python 3.9+, один файл.
 
@@ -15,10 +16,12 @@
 (другой путь к данным: переменная окружения GENSHTAB_DATA). При первом запуске данные Темпа из ~/.tempo
 копируются сюда сами, оригинал не трогается.
 
-Внутри: Ставка кампании-85 (приказ на день, линия фронта, разведка Монте-Карло, наряды вне очереди, резерв,
-переносы нормы, звания), штурмы по таймеру, приказы-задачи, план недели, операции с дедлайнами, рубежи
-по силлабусам, распорядок, хронометраж, конспекты и карточки, связи. Ctrl+K — поиск по задачам и командам,
-Ctrl+I — записать мысль, F1 — все клавиши и синтаксис быстрого ввода.
+Внутри: Ставка кампании (приказ на день, линия фронта, разведка Монте-Карло, наряды вне очереди, резерв,
+переносы нормы, звания и выслуга, личное дело, правила Устава, смена кампаний), штурмы по таймеру,
+Дисциплина (ПВО — перехват соблазнов, протоколы «если — то», боевые листы, сигналы), приказы-задачи, план недели,
+операции с дедлайнами, рубежи по силлабусам, распорядок, физподготовка, казна, хронометраж, конспекты и
+карточки, связи. Ctrl+K — поиск по задачам и командам, Ctrl+I — записать мысль, Ctrl+U — перехват соблазна,
+F1 — все клавиши и синтаксис быстрого ввода.
 """
 
 from __future__ import annotations
@@ -868,7 +871,7 @@ class Integration:
             f"  $s.Arguments = {ps_str(args)}\n"
             f"  $s.WorkingDirectory = {ps_str(APP_DIR)}\n"
             f"  $s.IconLocation = {ps_str(str(ico) + ',0')}\n"
-            f"  $s.Description = {ps_str('Генштаб: приказ на день, штурмы, сводки и разведка')}\n"
+            f"  $s.Description = {ps_str('Генштаб: приказ на день, штурмы, дисциплина, тыл и разведка')}\n"
             "  $s.Save()\n"
             "  Write-Output $path\n"
             "}\n")
@@ -954,7 +957,7 @@ class Integration:
 
     def _desktop_entry(self, minimized=False, autostart=False):
         lines = ["[Desktop Entry]", "Type=Application", "Version=1.0", f"Name={APP_NAME}",
-                 "Comment=Генштаб: приказ на день, штурмы, сводки и разведка",
+                 "Comment=Генштаб: приказ на день, штурмы, дисциплина, тыл и разведка",
                  "Exec=" + " ".join(_desktop_quote(c) for c in self.command(minimized)),
                  f"Icon={APP_DIR / 'genshtab.png'}", "Terminal=false", "Categories=Office;Utility;",
                  "StartupWMClass=Genshtab"]
@@ -9419,6 +9422,10 @@ class KitMixin:
         st, en = sys_date(nxt.get("start")), sys_date(nxt.get("end"))
         if not st or not en or (today <= self.end() and today < st):
             return False
+        try:
+            self.app.store.backup_now(f"data-before-campaign-{today:%Y%m%d}.json")
+        except OSError:
+            pass
         self.s["next_campaign"] = {}
         self.start_campaign(today, nxt.get("name") or CAMPAIGN, st, en, float(nxt.get("hours") or 0),
                             int(nxt.get("reserve") or 0), carry_xp=bool(nxt.get("carry_xp", True)),
@@ -23209,6 +23216,18 @@ class FitTestDialog(tk.Toplevel):
 MONTHS_NOM = ("Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь",
               "Ноябрь", "Декабрь")
 MONEY_HINT = "350 кафе шаурма · 1,2к продукты · 900 одежда футболка ! — «!» в конце: импульсная покупка"
+# слово в заметке → стандартная категория, если её название не написано
+MONEY_WORDS = {
+    "Транспорт": ("такси", "метро", "автобус", "электричк", "поезд", "бензин", "каршеринг", "самокат", "проезд"),
+    "Кафе и доставка": ("кофе", "кафе", "ресторан", "доставк", "шаурм", "пицц", "бургер", "столов", "обед", "ужин"),
+    "Продукты": ("продукт", "магазин", "пятёрочк", "пятерочк", "перекрёст", "перекрест", "ашан", "вкусвилл", "молоко"),
+    "Связь и подписки": ("интернет", "связь", "подписк", "мобильн", "spotify", "netflix", "яндекс плюс"),
+    "Учёба и книги": ("книг", "учебник", "курс", "канцеляр", "печать"),
+    "Спорт и здоровье": ("аптек", "лекарств", "спортзал", "абонемент", "врач", "протеин"),
+    "Одежда": ("одежд", "обувь", "кроссовк", "футболк", "куртк"),
+    "Развлечения": ("кино", "игр", "концерт", "steam"),
+    "Подарки": ("подарок", "подарк", "цветы"),
+}
 
 
 def parse_money_line(text, cats):
@@ -23237,6 +23256,9 @@ def parse_money_line(text, cats):
             if hit:
                 cat, note = hit, " ".join(words[k:])
                 break
+        if cat is None:
+            low = rest.lower()
+            cat = next((c for c, keys in MONEY_WORDS.items() if c in cats and any(w in low for w in keys)), None)
     return amount, cat or ("Прочее" if "Прочее" in cats else (cats[-1] if cats else "Прочее")), note, impulse
 
 
@@ -23273,6 +23295,9 @@ class MoneyView(KitView):
         e = ttk.Entry(row, textvariable=self.entry_var, font=F["ui"])
         e.pack(side="left", fill="x", expand=True)
         e.bind("<Return>", lambda ev: self._quick())
+        if getattr(self, "_refocus", False):
+            self._refocus = False
+            e.after_idle(e.focus_set)
         ttk.Button(row, text="Записать", style="Work.TButton", command=self._quick).pack(side="left", padx=(px(8), 0))
         ttk.Button(row, text="Подробно", command=lambda: app.edit_money(None)).pack(side="left", padx=(px(6), 0))
         ui_text(card, app, MONEY_HINT + ". Категории: " + ", ".join(sysm.money_cats()) + ".").pack(
@@ -23404,6 +23429,7 @@ class MoneyView(KitView):
         except ValueError as exc:
             messagebox.showwarning(APP_NAME, f"Трата: {exc}.", parent=app)
             return
+        self._refocus = True
         app.money_record(app.today(), amount, cat, note, impulse)
 
     def _entry(self, tree):
@@ -24658,7 +24684,7 @@ class App(tk.Tk):
                   ("Ставка: календарь и рубежи", "", lambda: sysv.set_tab("calendar")),
                   ("Ставка: устав", "", lambda: sysv.set_tab("plan")),
                   ("Новое событие в календаре", "", lambda: self.edit_event(None))]
-        disc, fit, money = self.views["discipline"], self.views["fitness"], self.views["money"]
+        disc = self.views["discipline"]
         items += [("Перехват соблазна (ПВО)", "Ctrl+U", self.open_urge),
                   ("Дисциплина: ПВО", "", lambda: disc.set_tab("pvo")),
                   ("Дисциплина: протоколы «если — то»", "", lambda: disc.set_tab("protocols")),

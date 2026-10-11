@@ -447,7 +447,7 @@ def install(tempo, built, autostart):
             "  $s.Arguments = ''\n"
             f"  $s.WorkingDirectory = {tempo.ps_str(target)}\n"
             f"  $s.IconLocation = {tempo.ps_str(str(exe) + ',0')}\n"
-            f"  $s.Description = {tempo.ps_str('Генштаб: приказ на день, штурмы, сводки и разведка')}\n"
+            f"  $s.Description = {tempo.ps_str('Генштаб: приказ на день, штурмы, дисциплина, тыл и разведка')}\n"
             "  $s.Save()\n"
             "  Write-Output $path\n"
             "}\n")
@@ -472,7 +472,7 @@ def install(tempo, built, autostart):
     else:
         shutil.copy2(BUILD / "genshtab.png", target / "genshtab.png")
         entry = ("[Desktop Entry]\nType=Application\nVersion=1.0\nName=Генштаб\n"
-                 "Comment=Генштаб: приказ на день, штурмы, сводки и разведка\n"
+                 "Comment=Генштаб: приказ на день, штурмы, дисциплина, тыл и разведка\n"
                  f"Exec={exe}\nIcon={target / 'genshtab.png'}\nTerminal=false\nCategories=Office;Utility;\n"
                  "StartupWMClass=Genshtab\n")
         menu = Path.home() / ".local" / "share" / "applications" / "genshtab.desktop"
@@ -559,8 +559,9 @@ def main(argv):
             subprocess.Popen([str(exe)], cwd=str(exe.parent),
                              creationflags=0x00000008 if IS_WIN else 0,  # DETACHED_PROCESS
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    say("\nГотово. Генштаб — обычная программа: открывается с ярлыка «Генштаб», живёт в трее.")
-    say("При первом запуске он заберёт данные Темпа (~/.tempo → ~/.genshtab) и развернёт кампанию-85.")
+    say(f"\nГотово. Генштаб {tempo.VERSION} — обычная программа: открывается с ярлыка «Генштаб», живёт в трее.")
+    say("Данные в ~/.genshtab на месте; при первом запуске новой версии откроется «Что нового».")
+    say("Если это первый запуск после Темпа — он заберёт его данные (~/.tempo → ~/.genshtab) и развернёт кампанию.")
     say("Папку со сборкой build/ можно удалить, программе она не нужна.")
     return 0
 
