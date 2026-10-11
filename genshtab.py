@@ -11000,7 +11000,7 @@ class CheckinForm(tk.Frame):
             box = tk.Frame(self, bg=bg)
             box.grid(row=12, column=0, columnspan=2, sticky="we", pady=(px(10), 0))
             for c in lists:
-                ChecklistCard(box, app, c, d).pack(fill="x", pady=(0, px(4)))
+                checklist_widget(box, app, c, d).pack(fill="x", pady=(0, px(4)))
         btns = tk.Frame(self, bg=bg)
         btns.grid(row=13, column=0, columnspan=2, sticky="we", pady=(px(16), 0))
         ttk.Button(btns, text="Доложить", style="Work.TButton", command=self._save).pack(side="right")
@@ -11506,9 +11506,11 @@ class LockScreen(tk.Toplevel):
         self.clock = tk.Label(holder, text="", font=F["timer_mid"], bg=LOCK_BG, fg=LOCK_INK)
         self.clock.pack(pady=(0, px(4)))
         line = app.system.motivation()
+        self.motto = None
         if line:
-            tk.Label(holder, text=line, font=F["ui"], bg=LOCK_BG, fg=LOCK_MUTED, wraplength=px(640),
-                     justify="center").pack(pady=(0, px(12)))
+            self.motto = tk.Label(holder, text=line, font=F["ui"], bg=LOCK_BG, fg=LOCK_MUTED, wraplength=px(640),
+                                  justify="center")
+            self.motto.pack(pady=(0, px(12)))
         outer = tk.Frame(holder, bg=C.LINE, padx=1, pady=1)
         outer.pack()
         panel = tk.Frame(outer, bg=C.SURFACE, padx=px(26), pady=px(20))
@@ -11553,6 +11555,15 @@ class LockScreen(tk.Toplevel):
                 ttk.Button(row, text="Пропустить", command=lambda: self._skip(skip, phrase)).pack(side="left")
             self.msg = tk.Label(low, text="", font=F["small"], bg=LOCK_BG, fg="#F0645A")
             self.msg.pack(anchor="w", pady=(px(4), 0))
+        try:
+            self.update_idletasks()
+            if holder.winfo_reqheight() > sh - px(16):
+                # низкий экран: часы и девиз — украшение, форма и кнопки важнее
+                self.clock.pack_forget()
+                if self.motto is not None:
+                    self.motto.pack_forget()
+        except tk.TclError:
+            pass
         self.protocol("WM_DELETE_WINDOW", lambda: None)
         self.bind("<Escape>", lambda e: "break")
         self._tick()
@@ -11684,7 +11695,7 @@ class MorningForm(tk.Frame):
                      bg=bg, fg=C.FOCUS, anchor="w", justify="left", wraplength=px(580)).pack(fill="x", pady=(px(6), 0))
         if (sysm.coach.get("lists") or {}).get("morning", True):
             for c in sysm.checklists(today, "morning"):
-                ChecklistCard(self, app, c, today).pack(fill="x", pady=(px(8), 0))
+                checklist_widget(self, app, c, today).pack(fill="x", pady=(px(8), 0))
         form = tk.Frame(self, bg=bg)
         form.pack(fill="x", pady=(px(10), 0))
         form.columnconfigure(1, weight=1)
@@ -22923,6 +22934,19 @@ class UrgeDialog(tk.Toplevel):
             return
         self.destroy()
         self.app.urge_log(what, self.power, result, self.note.get().strip())
+
+
+def checklist_widget(parent, app, checklist, day):
+    """Лист с галочками, а на низком экране — одна строка: построение и сводка должны влезать целиком."""
+    if app.winfo_screenheight() >= app.px(880):
+        return ChecklistCard(parent, app, checklist, day)
+    sysm = app.system
+    n = len(checklist["items"])
+    m = len(sysm.check_state(day, checklist["id"]) & set(range(n)))
+    return tk.Label(parent, text=f"{checklist['title']}: {m} из {n} — отметить в «Дисциплине → Боевые листы» или "
+                                 f"боту «лист {checklist['title'].split()[-1].lower()} всё»",
+                    font=app.fonts["small"], bg=parent.cget("bg"), fg=C.FOCUS, anchor="w", justify="left",
+                    wraplength=app.px(560))
 
 
 class ChecklistCard(tk.Frame):
