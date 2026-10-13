@@ -1,0 +1,782 @@
+<!doctype html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  ГЛАВНАЯ СТРАНИЦА САЙТА                                          ║
+  ║                                                                  ║
+  ║  Как редактировать:                                              ║
+  ║  • Тексты меняй прямо здесь — между тегами, например:            ║
+  ║      <p>Вот этот текст можно менять</p>                          ║
+  ║  • Места, которые нужно заменить на свои данные, отмечены ✏️     ║
+  ║  • Имя «Алексей» и город «Москва» удобнее всего заменить разом:  ║
+  ║    Ctrl+H (Найти и заменить) → «Алексей» → твоё имя/ник.         ║
+  ║  • Контакты, цвета и анкета — в файле assets/js/config.js        ║
+  ║  • Подробная инструкция — в файле GUIDE.md                       ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+<html lang="ru" data-theme="teal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- ✏️ SEO: заголовок вкладки и описание для поисковиков (Яндекс, Google).
+       Обязательно укажи свой город — люди ищут «донор спермы + город». -->
+  <title>Частный донор спермы в Москве — Алексей | Свежие анализы, договор, конфиденциальность</title>
+  <meta name="description" content="Частный донор спермы в Москве. Анализы обновляются каждые 3 месяца, документы покажу при знакомстве. Клиника или домашняя инсеминация, письменное соглашение, полная конфиденциальность.">
+
+  <!-- ✏️ Замени example.ru на свой адрес сайта (после публикации) -->
+  <link rel="canonical" href="https://example.ru/">
+
+  <!-- Превью ссылки в Telegram, WhatsApp, VK -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:title" content="Частный донор спермы — Алексей, Москва">
+  <meta property="og:description" content="Свежие анализы, письменное соглашение, бережное сопровождение. Напишите — отвечу в течение дня.">
+  <meta property="og:image" content="https://example.ru/assets/img/og-image.jpg">
+  <meta property="og:url" content="https://example.ru/">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <meta name="theme-color" content="#FBF8F3">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+
+  <!-- Шрифты -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="assets/css/style.css">
+
+  <!-- Настройки (контакты, тема, анкета) -->
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/main.js" defer></script>
+</head>
+
+<body>
+
+<!-- Набор иконок. Использование: <svg class="icon"><use href="#i-heart"/></svg>
+     Не редактируй — просто подставляй нужный id в других местах. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-file-check" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m9 15 2 2 4-4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+    <symbol id="i-microscope" viewBox="0 0 24 24"><path d="M6 18h8"/><path d="M3 22h18"/><path d="M14 22a7 7 0 1 0 0-14h-1"/><path d="M9 14h2"/><path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/><path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-hospital" viewBox="0 0 24 24"><path d="M12 6v4"/><path d="M14 14h-4"/><path d="M14 18h-4"/><path d="M14 8h-4"/><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-dna" viewBox="0 0 24 24"><path d="m10 16 1.5 1.5"/><path d="m14 8-1.5-1.5"/><path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993"/><path d="m16.5 10.5 1 1"/><path d="m17 6-2.891-2.891"/><path d="M2 15c6.667-6 13.333 0 20-6"/><path d="m20 9 .891.891"/><path d="M3.109 14.109 4 15"/><path d="m6.5 12.5 1 1"/><path d="m7 18 2.891 2.891"/><path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></symbol>
+    <symbol id="i-telegram" viewBox="0 0 24 24"><path class="fill" d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></symbol>
+    <symbol id="i-whatsapp" viewBox="0 0 24 24"><path class="fill" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip-link" href="#main">Перейти к содержанию</a>
+
+<!-- ============================== ШАПКА ============================== -->
+<header class="header" id="top">
+  <div class="container header__inner">
+    <a class="logo" href="#top" aria-label="На главную">
+      <span class="logo__mark"><svg class="icon"><use href="#i-sprout"/></svg></span>
+      <span class="logo__text">
+        <span class="logo__name">Алексей</span>            <!-- ✏️ имя или ник -->
+        <span class="logo__tag">частный донор</span>
+      </span>
+    </a>
+
+    <!-- Меню. Чтобы убрать пункт — удали строку <li>...</li> целиком -->
+    <nav class="nav" id="nav" aria-label="Основное меню">
+      <ul class="nav__list">
+        <li><a href="#about">Обо мне</a></li>
+        <li><a href="#health">Анализы</a></li>
+        <li><a href="#process">Как это работает</a></li>
+        <li><a href="#terms">Условия</a></li>
+        <li><a href="#faq">Вопросы</a></li>
+      </ul>
+      <a class="btn btn--primary nav__cta" href="#contact">Написать</a>
+    </nav>
+
+    <a class="btn btn--primary btn--sm header__cta" href="#contact">Написать мне</a>
+    <button class="burger" type="button" aria-label="Открыть меню" aria-controls="nav" aria-expanded="false">
+      <svg class="icon burger__open"><use href="#i-menu"/></svg>
+      <svg class="icon burger__close"><use href="#i-x"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============================== ПЕРВЫЙ ЭКРАН ============================== -->
+<section class="hero">
+  <div class="hero__bg" aria-hidden="true">
+    <span class="blob blob--1"></span>
+    <span class="blob blob--2"></span>
+    <span class="blob blob--3"></span>
+  </div>
+
+  <div class="container hero__inner">
+    <div class="hero__content">
+      <!-- ✏️ Статус. Если сделаешь паузу — поменяй текст, например: «Новые запросы — с января» -->
+      <p class="pill reveal"><span class="pulse-dot"></span>Сейчас принимаю новые запросы · Москва</p>
+
+      <h1 class="hero__title reveal">Помогу вашей семье <em>стать&nbsp;больше</em></h1>
+
+      <p class="hero__lead reveal">
+        Я — частный донор спермы. Регулярно сдаю анализы, открыто показываю результаты
+        и бережно сопровождаю на каждом шаге — от первого сообщения до двух полосок.
+      </p>
+
+      <div class="hero__actions reveal">
+        <a class="btn btn--primary btn--lg" data-contact="telegram" href="#contact">
+          <svg class="icon"><use href="#i-telegram"/></svg>Написать в Telegram
+        </a>
+        <a class="btn btn--ghost btn--lg" href="#health">
+          Посмотреть анализы<svg class="icon"><use href="#i-arrow-down"/></svg>
+        </a>
+      </div>
+
+      <!-- ✏️ Цифры. data-count — число, до которого «досчитает» анимация -->
+      <ul class="hero__stats reveal">
+        <li><b><span data-count="12">12</span></b><span>анализов — все<br>в норме</span></li>
+        <li><b><span data-count="90">90</span>&nbsp;дн.</b><span>максимальный «возраст»<br>результатов</span></li>
+        <li><b><span data-count="24">24</span>&nbsp;ч</b><span>время ответа<br>на сообщение</span></li>
+      </ul>
+    </div>
+
+    <!-- Карточка донора справа -->
+    <div class="hero__visual reveal" aria-label="Краткая анкета донора">
+      <span class="hero__ring" aria-hidden="true"></span>
+
+      <div class="profile-card">
+        <div class="profile-card__top">
+          <div class="avatar" aria-hidden="true">А</div>   <!-- ✏️ первая буква имени -->
+          <div>
+            <p class="profile-card__name">Алексей, 31</p>  <!-- ✏️ имя, возраст -->
+            <p class="profile-card__meta"><svg class="icon"><use href="#i-map-pin"/></svg>Москва</p>
+          </div>
+          <span class="tag tag--ok">Открыт к&nbsp;знакомству</span>
+        </div>
+
+        <!-- ✏️ Основные параметры -->
+        <dl class="profile-card__grid">
+          <div><dt>Рост</dt><dd>183 см</dd></div>
+          <div><dt>Глаза</dt><dd>Серо-голубые</dd></div>
+          <div><dt>Волосы</dt><dd>Русые</dd></div>
+          <div><dt>Кровь</dt><dd>A(II) Rh+</dd></div>
+        </dl>
+
+        <div class="profile-card__tests">
+          <div class="profile-card__tests-row">
+            <span><svg class="icon"><use href="#i-file-check"/></svg>Анализы: 12 из 12 в норме</span>
+            <b>100%</b>
+          </div>
+          <div class="progress"><span style="width:100%"></span></div>
+          <p class="profile-card__updated">Обновлено 01.10.2026 · следующее — январь</p>
+        </div>
+      </div>
+
+      <div class="float-badge float-badge--1">
+        <span class="float-badge__icon"><svg class="icon"><use href="#i-shield"/></svg></span>
+        <span><b>ВИЧ, гепатиты, ИППП</b><small>отрицательно</small></span>
+      </div>
+      <div class="float-badge float-badge--2">
+        <span class="float-badge__icon float-badge__icon--accent"><svg class="icon"><use href="#i-clock"/></svg></span>
+        <span><b>Отвечаю за 24 часа</b><small>Telegram и WhatsApp</small></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Бегущая строка. ✏️ Меняй фразы в обоих списках одинаково -->
+<div class="marquee" aria-label="Мои принципы">
+  <div class="marquee__track">
+    <ul>
+      <li>Анализы каждые 3 месяца</li><li>Письменное соглашение</li><li>Полная конфиденциальность</li>
+      <li>Клиника или домашняя инсеминация</li><li>Ограниченное число семей</li><li>Без давления и спешки</li>
+    </ul>
+    <ul aria-hidden="true">
+      <li>Анализы каждые 3 месяца</li><li>Письменное соглашение</li><li>Полная конфиденциальность</li>
+      <li>Клиника или домашняя инсеминация</li><li>Ограниченное число семей</li><li>Без давления и спешки</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================== КОМУ Я ПОМОГАЮ ============================== -->
+<section class="section" id="for-whom">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Кому я помогаю</p>
+      <h2>Каждая история&nbsp;— <em>особенная</em></h2>
+      <p class="section-head__lead">Неважно, как вы пришли к этому решению. Важно, что вы готовы. Я помогу пройти этот путь спокойно и без осуждения.</p>
+    </div>
+
+    <div class="cards-3">
+      <article class="card card--hover reveal">
+        <span class="card__icon"><svg class="icon"><use href="#i-heart"/></svg></span>
+        <h3>Женщинам, которые решили стать мамой</h3>
+        <p>Вы готовы к материнству и не хотите ждать «того самого». Это смелое, взрослое решение — и я с уважением к нему отношусь.</p>
+      </article>
+      <article class="card card--hover reveal">
+        <span class="card__icon card__icon--accent"><svg class="icon"><use href="#i-users"/></svg></span>
+        <h3>Парам с мужским фактором бесплодия</h3>
+        <p>Если у партнёра сложности со спермограммой, донорство даёт реальный шанс на беременность — без лет бесконечных попыток.</p>
+      </article>
+      <article class="card card--hover reveal">
+        <span class="card__icon card__icon--lilac"><svg class="icon"><use href="#i-user"/></svg></span>
+        <h3>Тем, кому важен живой человек, а не каталог</h3>
+        <p>В банке спермы — анонимная анкета и высокая цена. Со мной можно познакомиться, задать любые вопросы и принять решение спокойно.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ПОЧЕМУ Я ============================== -->
+<section class="section section--alt" id="why">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Почему мне доверяют</p>
+      <h2>Честно, безопасно, <em>по-человечески</em></h2>
+    </div>
+
+    <div class="bento">
+      <article class="bento__item bento__item--feature reveal">
+        <span class="card__icon card__icon--light"><svg class="icon"><use href="#i-shield"/></svg></span>
+        <h3>Здоровье, подтверждённое документами</h3>
+        <p>Никаких «поверьте на слово». Покажу оригиналы анализов, а при желании сдадим их вместе — в лаборатории, которую выберете вы.</p>
+        <ul class="checklist checklist--light">
+          <li><svg class="icon"><use href="#i-check"/></svg>Полный пакет инфекций</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Спермограмма и MAR-тест</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Кариотип и генетика</li>
+        </ul>
+      </article>
+
+      <article class="bento__item reveal">
+        <span class="card__icon"><svg class="icon"><use href="#i-file-check"/></svg></span>
+        <h3>Письменное соглашение</h3>
+        <p>Фиксируем договорённости на бумаге: роли, ожидания, формат общения в будущем.</p>
+      </article>
+
+      <article class="bento__item reveal">
+        <span class="card__icon card__icon--accent"><svg class="icon"><use href="#i-lock"/></svg></span>
+        <h3>Конфиденциальность</h3>
+        <p>Ваши данные и история остаются между нами. Можно общаться анонимно.</p>
+      </article>
+
+      <article class="bento__item reveal">
+        <span class="card__icon card__icon--lilac"><svg class="icon"><use href="#i-users"/></svg></span>
+        <h3>Не более 10&nbsp;семей</h3>   <!-- ✏️ твой лимит -->
+        <p>Ограничиваю число семей, чтобы генетические братья и сёстры не встретились случайно.</p>
+      </article>
+
+      <article class="bento__item reveal">
+        <span class="card__icon"><svg class="icon"><use href="#i-calendar"/></svg></span>
+        <h3>Под ваш цикл</h3>
+        <p>Подстраиваюсь под дни овуляции, в том числе в выходные и вечером.</p>
+      </article>
+
+      <article class="bento__item bento__item--wide reveal">
+        <span class="card__icon card__icon--accent"><svg class="icon"><use href="#i-heart"/></svg></span>
+        <div>
+          <h3>Никакого давления</h3>
+          <p>Вы можете задавать любые вопросы, взять паузу или передумать на любом этапе. Решение всегда за вами.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ОБО МНЕ ============================== -->
+<section class="section" id="about">
+  <div class="container about">
+    <div class="about__media reveal">
+      <div class="photo-frame">
+        <!-- ✏️ ФОТО: положи свою фотографию в папку assets/img/ и замени имя файла ниже,
+             например src="assets/img/donor.jpg". Можно оставить заглушку — многие доноры
+             показывают фото только при личном общении. -->
+        <img src="assets/img/donor-placeholder.svg" alt="Фото донора" width="560" height="700" loading="lazy">
+        <span class="photo-frame__chip"><svg class="icon"><use href="#i-eye-off"/></svg>Фото — при личном общении</span>
+      </div>
+      <span class="about__deco" aria-hidden="true"></span>
+    </div>
+
+    <div class="about__content">
+      <p class="eyebrow reveal">Обо мне</p>
+      <h2 class="reveal">Привет, я&nbsp;<em>Алексей</em></h2>
+
+      <!-- ✏️ Расскажи о себе своими словами: 2–3 коротких абзаца -->
+      <p class="reveal">Мне 31 год, я живу в Москве и работаю инженером. Люблю бег, книги и долгие поездки за город. Сам вырос в большой дружной семье и знаю, как много значат дети.</p>
+      <p class="reveal">Донорством занимаюсь осознанно: однажды увидел, через что проходят люди в очередях клиник, и понял, что могу помочь — честно и без лишних сложностей.</p>
+
+      <blockquote class="quote reveal">
+        <svg class="icon"><use href="#i-quote"/></svg>
+        <p>Для меня главное — чтобы вы чувствовали себя в безопасности и были уверены в каждом шаге.</p>
+      </blockquote>
+
+      <!-- ✏️ Анкета. Строку можно удалить или добавить новую по образцу -->
+      <dl class="specs reveal">
+        <div><dt>Возраст</dt><dd>31 год</dd></div>
+        <div><dt>Рост / вес</dt><dd>183 см / 78 кг</dd></div>
+        <div><dt>Телосложение</dt><dd>Спортивное</dd></div>
+        <div><dt>Глаза</dt><dd>Серо-голубые</dd></div>
+        <div><dt>Волосы</dt><dd>Русые</dd></div>
+        <div><dt>Группа крови</dt><dd>A(II) Rh+</dd></div>
+        <div><dt>Происхождение</dt><dd>Славянское</dd></div>
+        <div><dt>Образование</dt><dd>Высшее техническое</dd></div>
+        <div><dt>Вредные привычки</dt><dd>Не курю, алкоголь редко</dd></div>
+        <div><dt>Свои дети</dt><dd>Есть, здоровы</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== АНАЛИЗЫ ============================== -->
+<section class="section section--deep" id="health">
+  <div class="container">
+    <div class="health__head">
+      <div class="section-head section-head--left reveal">
+        <p class="eyebrow eyebrow--light">Здоровье</p>
+        <h2>Анализы&nbsp;— <em>открыто</em> и&nbsp;регулярно</h2>
+        <p class="section-head__lead">Пересдаю полный пакет каждые 3 месяца. Сканы отправлю по запросу, оригиналы покажу при встрече.</p>
+      </div>
+      <!-- ✏️ Даты последней и следующей сдачи -->
+      <div class="updated-card reveal">
+        <svg class="icon"><use href="#i-calendar"/></svg>
+        <div>
+          <small>Последнее обновление</small>
+          <b>01 октября 2026</b>
+          <small>Следующее — январь 2027</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✏️ СПИСОК АНАЛИЗОВ
+         Статус «в норме»:      class="test is-ok"
+         Статус «сдаю / жду»:   class="test is-pending"  (иконка станет часами) -->
+    <div class="tests">
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>Спермограмма + MAR-тест</h3>
+        <p>Концентрация, подвижность, морфология по Крюгеру</p>
+        <footer><b>Норма</b><time>01.10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>ВИЧ 1/2</h3>
+        <p>Антиген p24 + антитела (тест 4-го поколения)</p>
+        <footer><b>Отрицательно</b><time>01.10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>Гепатиты B и C</h3>
+        <p>HBsAg, anti-HCV</p>
+        <footer><b>Отрицательно</b><time>01.10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>Сифилис</h3>
+        <p>Суммарные антитела + RPR</p>
+        <footer><b>Отрицательно</b><time>01.10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>ИППП методом ПЦР</h3>
+        <p>Хламидии, гонорея, трихомонада, микоплазма, уреаплазма</p>
+        <footer><b>Не обнаружено</b><time>01.10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>ЦМВ и вирус герпеса</h3>
+        <p>Антитела IgG / IgM — активной инфекции нет</p>
+        <footer><b>IgM отриц.</b><time>01.10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>Кариотип</h3>
+        <p>Хромосомный набор без отклонений</p>
+        <footer><b>46,XY — норма</b><time>03.2026</time></footer>
+      </article>
+      <article class="test is-pending reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-hourglass"/></svg></span>
+        <h3>Генетический скрининг</h3>
+        <p>Носительство муковисцидоза, СМА и других частых мутаций</p>
+        <footer><b>Результат в ноябре</b><time>сдан 10.2026</time></footer>
+      </article>
+      <article class="test is-ok reveal">
+        <span class="test__status"><svg class="icon"><use href="#i-check"/></svg></span>
+        <h3>Группа крови и резус</h3>
+        <p>Важно для планирования беременности</p>
+        <footer><b>A(II) Rh+</b><time>постоянно</time></footer>
+      </article>
+    </div>
+
+    <div class="health__note reveal">
+      <p><svg class="icon"><use href="#i-microscope"/></svg>Готов пересдать любые анализы в лаборатории по вашему выбору — до начала попыток.</p>
+      <a class="btn btn--light" data-contact="telegram" href="#contact">Запросить сканы<svg class="icon"><use href="#i-arrow-right"/></svg></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== КАК ЭТО РАБОТАЕТ ============================== -->
+<section class="section" id="process">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Как это работает</p>
+      <h2>Пять спокойных шагов</h2>
+      <p class="section-head__lead">Мы идём в вашем темпе. На любом этапе можно остановиться, задать вопрос или передумать.</p>
+    </div>
+
+    <ol class="steps">
+      <li class="step reveal">
+        <span class="step__num">1</span>
+        <h3>Знакомство</h3>
+        <p>Вы пишете в Telegram или WhatsApp, рассказываете о себе и задаёте любые вопросы. Это ни к чему не обязывает.</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__num">2</span>
+        <h3>Звонок или встреча</h3>
+        <p>Знакомимся вживую или по видео. Обсуждаем ожидания: анонимность, участие в будущем, число попыток.</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__num">3</span>
+        <h3>Анализы и соглашение</h3>
+        <p>Показываю свежие результаты, при желании сдаём заново. Письменно фиксируем все договорённости.</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__num">4</span>
+        <h3>Донация</h3>
+        <p>В клинике или в формате домашней инсеминации — как комфортно вам. Подстраиваюсь под ваш цикл.</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__num">5</span>
+        <h3>Поддержка</h3>
+        <p>Остаюсь на связи до результата и после — ровно в том формате, о котором мы договорились.</p>
+      </li>
+    </ol>
+
+    <!-- Форматы донации -->
+    <div class="methods">
+      <article class="method reveal">
+        <span class="card__icon"><svg class="icon"><use href="#i-hospital"/></svg></span>
+        <div>
+          <h3>Через клинику</h3>
+          <p>Донация в клинике репродукции по вашему выбору: ВМИ или ЭКО под контролем врача. Самый защищённый вариант — и с медицинской, и с юридической стороны.</p>
+          <ul class="checklist">
+            <li><svg class="icon"><use href="#i-check"/></svg>Контроль врача на каждом этапе</li>
+            <li><svg class="icon"><use href="#i-check"/></svg>Документы оформляет клиника</li>
+          </ul>
+        </div>
+      </article>
+      <article class="method reveal">
+        <span class="card__icon card__icon--accent"><svg class="icon"><use href="#i-home"/></svg></span>
+        <div>
+          <h3>Домашняя инсеминация</h3>
+          <p>Вы получаете стерильный контейнер и проводите процедуру сами, в спокойной обстановке. Дам подробную инструкцию и стерильный набор.</p>
+          <ul class="checklist">
+            <li><svg class="icon"><use href="#i-check"/></svg>Быстро, приватно и без очередей</li>
+            <li><svg class="icon"><use href="#i-check"/></svg>Удобно подстроить под овуляцию</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== УСЛОВИЯ ============================== -->
+<section class="section section--alt" id="terms">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Условия</p>
+      <h2>Прозрачно и <em>без сюрпризов</em></h2>
+      <p class="section-head__lead">Всё обсуждаем заранее и фиксируем в соглашении. Никаких скрытых платежей.</p>
+    </div>
+
+    <!-- ✏️ Тарифы. Цены и пункты — свои. Карточку с классом plan--featured выделяет цвет -->
+    <div class="plans">
+      <article class="plan reveal">
+        <h3>Знакомство</h3>
+        <p class="plan__price">Бесплатно</p>
+        <p class="plan__desc">Первый шаг, который ни к чему не обязывает</p>
+        <ul class="checklist">
+          <li><svg class="icon"><use href="#i-check"/></svg>Переписка и ответы на вопросы</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Видеозвонок или встреча</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Сканы всех анализов</li>
+        </ul>
+        <a class="btn btn--ghost btn--block" href="#contact">Познакомиться</a>
+      </article>
+
+      <article class="plan plan--featured reveal">
+        <span class="plan__badge">Основной формат</span>
+        <h3>Донация</h3>
+        <p class="plan__price"><small>от</small> 5&nbsp;000&nbsp;₽</p>
+        <p class="plan__desc">Компенсация моих расходов за одну попытку</p>
+        <ul class="checklist checklist--light">
+          <li><svg class="icon"><use href="#i-check"/></svg>Свежие анализы и их пересдача</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Стерильный набор и инструкция</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Дорога к вам или в клинику</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Письменное соглашение</li>
+        </ul>
+        <a class="btn btn--light btn--block" data-contact="telegram" href="#contact">Обсудить условия</a>
+      </article>
+
+      <article class="plan reveal">
+        <h3>До результата</h3>
+        <p class="plan__price">Индивидуально</p>
+        <p class="plan__desc">Несколько попыток в течение 3–6 циклов</p>
+        <ul class="checklist">
+          <li><svg class="icon"><use href="#i-check"/></svg>Приоритет в датах овуляции</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Фиксированная стоимость пакета</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>Поддержка на всём пути</li>
+        </ul>
+        <a class="btn btn--ghost btn--block" href="#contact">Узнать подробнее</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ОТЗЫВЫ ==============================
+     ✏️ Здесь должны быть ТОЛЬКО настоящие отзывы — с разрешения автора.
+     Выдуманные отзывы подрывают доверие и нарушают закон о рекламе.
+     Пока отзывов нет — можно скрыть весь раздел: добавь слово hidden
+     в тег <section ... hidden>.                                          -->
+<section class="section" id="reviews">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Отзывы</p>
+      <h2>Истории, которыми <em>делятся</em></h2>
+      <p class="section-head__lead">Публикую только с разрешения — без имён и фотографий.</p>
+    </div>
+
+    <div class="cards-3">
+      <figure class="review reveal">
+        <svg class="icon review__quote"><use href="#i-quote"/></svg>
+        <blockquote>Место для настоящего отзыва. Попросите тех, кому вы помогли, написать пару строк о том, как всё прошло, — и вставьте сюда.</blockquote>
+        <figcaption><span class="review__avatar">М</span><span><b>Инициалы</b><small>Город · год</small></span></figcaption>
+      </figure>
+      <figure class="review reveal">
+        <svg class="icon review__quote"><use href="#i-quote"/></svg>
+        <blockquote>Место для второго отзыва. Лучше всего работают конкретные детали: как быстро ответили, как прошла встреча, что было важно.</blockquote>
+        <figcaption><span class="review__avatar review__avatar--accent">Е</span><span><b>Инициалы</b><small>Город · год</small></span></figcaption>
+      </figure>
+      <figure class="review reveal">
+        <svg class="icon review__quote"><use href="#i-quote"/></svg>
+        <blockquote>Место для третьего отзыва. Можно вставить и короткую цитату из переписки — с согласия автора и без личных данных.</blockquote>
+        <figcaption><span class="review__avatar review__avatar--lilac">О</span><span><b>Инициалы</b><small>Город · год</small></span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ВОПРОСЫ И ОТВЕТЫ ==============================
+     ✏️ Чтобы добавить вопрос — скопируй блок <details>...</details> целиком. -->
+<section class="section section--alt" id="faq">
+  <div class="container faq">
+    <div class="faq__aside reveal">
+      <p class="eyebrow">Вопросы и ответы</p>
+      <h2>О чём <em>часто</em> спрашивают</h2>
+      <p>Не нашли ответ? Напишите — отвечу честно на любой вопрос, даже самый неловкий.</p>
+      <a class="btn btn--primary" data-contact="telegram" href="#contact"><svg class="icon"><use href="#i-telegram"/></svg>Задать вопрос</a>
+    </div>
+
+    <div class="faq__list">
+      <details class="faq-item reveal" name="faq" open>
+        <summary>Будете ли вы претендовать на ребёнка?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Нет. Я не претендую на родительские права и не вмешиваюсь в вашу семью. Мы подписываем письменное соглашение о намерениях. Честно скажу: частный договор не заменяет закон, поэтому для максимальной юридической защиты обеих сторон рекомендую донацию через клинику.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Можно ли посмотреть анализы до встречи?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Да. Отправлю сканы — личные данные на них закрою. Оригиналы покажу при встрече. Если хотите, сдадим анализы заново в лаборатории, которую выберете вы.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Как проходит домашняя инсеминация?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Вы получаете стерильный контейнер с материалом и вводите его специальным шприцем без иглы — самостоятельно, в спокойной обстановке. Я дам подробную пошаговую инструкцию и стерильный набор. Перед началом попыток советую проконсультироваться с гинекологом.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Сколько попыток обычно нужно?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>По-разному: зависит от возраста, здоровья и точности определения овуляции. Часто нужно несколько циклов — это нормально. Подскажу, как точнее поймать нужные дни.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Можно ли остаться анонимными?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Да. Можно общаться под псевдонимом и не называть фамилию. Ваши данные я никому не передаю и нигде не публикую.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Узнает ли ребёнок о доноре?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Решаете только вы. Я открыт к разным форматам: полная анонимность, возможность связаться со мной, когда ребёнку исполнится 18, или общение. Договариваемся заранее и записываем в соглашение.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Скольким семьям вы уже помогли?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Честно отвечу при знакомстве. Я ограничиваю число семей — не более 10, — чтобы снизить риск того, что генетические братья и сёстры случайно встретятся во взрослом возрасте.</p>
+        </div>
+      </details>
+      <details class="faq-item reveal" name="faq">
+        <summary>Вы работаете в других городах?<span class="faq-item__icon"><svg class="icon"><use href="#i-plus"/></svg></span></summary>
+        <div class="faq-item__body">
+          <p>Живу в Москве и работаю по Москве и области. Поездки в другие города обсуждаются отдельно.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== КОНТАКТЫ ============================== -->
+<section class="section" id="contact">
+  <div class="container">
+    <div class="contact">
+      <div class="contact__bg" aria-hidden="true"><span></span><span></span></div>
+
+      <div class="contact__info reveal">
+        <p class="eyebrow eyebrow--light">Контакты</p>
+        <h2>Давайте <em>познакомимся</em></h2>
+        <p>Напишите в удобный мессенджер — отвечу в течение дня. Первое сообщение ни к чему не обязывает: просто расскажите, что для вас важно.</p>
+
+        <!-- Кнопки берут адреса из assets/js/config.js. Пустой контакт — кнопка скрыта -->
+        <div class="contact__buttons">
+          <a class="contact-btn" data-contact="telegram" href="#">
+            <span class="contact-btn__icon contact-btn__icon--tg"><svg class="icon"><use href="#i-telegram"/></svg></span>
+            <span><b>Telegram</b><small data-contact-label="telegram">@username</small></span>
+          </a>
+          <a class="contact-btn" data-contact="whatsapp" href="#">
+            <span class="contact-btn__icon contact-btn__icon--wa"><svg class="icon"><use href="#i-whatsapp"/></svg></span>
+            <span><b>WhatsApp</b><small data-contact-label="whatsapp">+7 …</small></span>
+          </a>
+          <a class="contact-btn" data-contact="email" href="#">
+            <span class="contact-btn__icon"><svg class="icon"><use href="#i-mail"/></svg></span>
+            <span><b>Почта</b><small data-contact-label="email">почта</small></span>
+          </a>
+          <a class="contact-btn" data-contact="phone" href="#">
+            <span class="contact-btn__icon"><svg class="icon"><use href="#i-phone"/></svg></span>
+            <span><b>Телефон</b><small data-contact-label="phone">телефон</small></span>
+          </a>
+        </div>
+
+        <!-- ✏️ Режим работы -->
+        <ul class="contact__notes">
+          <li><svg class="icon"><use href="#i-clock"/></svg>Отвечаю ежедневно с 10:00 до 22:00</li>
+          <li><svg class="icon"><use href="#i-lock"/></svg>Можно писать анонимно</li>
+        </ul>
+      </div>
+
+      <!-- Анкета. Куда она уходит — настраивается в config.js (раздел form) -->
+      <form class="form reveal" id="lead-form" novalidate>
+        <h3>Короткая анкета</h3>
+        <p class="form__hint">Чтобы я сразу понял, чем помочь. Достаточно имени и контакта.</p>
+
+        <div class="form__row">
+          <label class="field">
+            <span>Как к вам обращаться *</span>
+            <input name="name" type="text" autocomplete="given-name" placeholder="Имя или псевдоним" required>
+          </label>
+          <label class="field">
+            <span>Город</span>
+            <input name="city" type="text" autocomplete="address-level2" placeholder="Москва">
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Как с вами связаться *</span>
+          <input name="contact" type="text" placeholder="@ник, телефон или почта" required>
+        </label>
+
+        <fieldset class="field">
+          <legend>Какой формат интересует</legend>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="format" value="Через клинику"><span>Клиника</span></label>
+            <label class="chip"><input type="radio" name="format" value="Домашняя инсеминация"><span>Дома</span></label>
+            <label class="chip"><input type="radio" name="format" value="Пока не решили" checked><span>Пока не знаю</span></label>
+          </div>
+        </fieldset>
+
+        <label class="field">
+          <span>Пара слов о себе</span>
+          <textarea name="message" rows="3" placeholder="Что для вас важно, какие есть вопросы"></textarea>
+        </label>
+
+        <label class="consent">
+          <input type="checkbox" name="consent" required>
+          <span>Согласен(на) на обработку данных согласно <a href="privacy.html">политике конфиденциальности</a></span>
+        </label>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit">
+          Отправить<svg class="icon"><use href="#i-arrow-right"/></svg>
+        </button>
+        <p class="form__status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================== ПОДВАЛ ============================== -->
+<footer class="footer">
+  <div class="container footer__inner">
+    <div class="footer__brand">
+      <a class="logo" href="#top">
+        <span class="logo__mark"><svg class="icon"><use href="#i-sprout"/></svg></span>
+        <span class="logo__text"><span class="logo__name">Алексей</span><span class="logo__tag">частный донор</span></span>
+      </a>
+      <p>Помогаю стать родителями — честно, безопасно и с уважением к вашим решениям.</p>
+    </div>
+
+    <nav class="footer__nav" aria-label="Разделы">
+      <a href="#about">Обо мне</a>
+      <a href="#health">Анализы</a>
+      <a href="#process">Как это работает</a>
+      <a href="#terms">Условия</a>
+      <a href="#faq">Вопросы</a>
+      <a href="#contact">Контакты</a>
+    </nav>
+
+    <div class="footer__social">
+      <a class="social" data-contact="telegram" href="#" aria-label="Telegram"><svg class="icon"><use href="#i-telegram"/></svg></a>
+      <a class="social" data-contact="whatsapp" href="#" aria-label="WhatsApp"><svg class="icon"><use href="#i-whatsapp"/></svg></a>
+      <a class="social" data-contact="email" href="#" aria-label="Почта"><svg class="icon"><use href="#i-mail"/></svg></a>
+    </div>
+  </div>
+
+  <div class="container footer__bottom">
+    <!-- ✏️ Дисклеймер — лучше оставить -->
+    <p>Сайт носит информационный характер и не является медицинской услугой или публичной офертой. Перед началом попыток проконсультируйтесь с врачом. 18+</p>
+    <p>© <span data-year>2026</span> · <a href="privacy.html">Политика конфиденциальности</a></p>
+  </div>
+</footer>
+
+<!-- Плавающая кнопка на телефоне -->
+<a class="sticky-cta" data-contact="telegram" href="#contact" aria-label="Написать в Telegram">
+  <svg class="icon"><use href="#i-telegram"/></svg><span>Написать</span>
+</a>
+
+<!-- Всплывающее уведомление -->
+<div class="toast" role="status" aria-live="polite"></div>
+
+</body>
+</html>

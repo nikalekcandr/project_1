@@ -1,0 +1,6 @@
+# Разрешаем поисковикам индексировать весь сайт.
+# ✏️ Замени example.ru на свой адрес.
+User-agent: *
+Allow: /
+
+Sitemap: https://example.ru/sitemap.xml

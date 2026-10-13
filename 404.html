@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- Страница «Не найдено». Показывается, если открыть несуществующий адрес.
+     Стили встроены прямо сюда, чтобы страница выглядела нормально на любом адресе. -->
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Страница не найдена</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 40px 16px; box-sizing: border-box;
+           background: #FBF8F3; color: #424A5C; font: 17px/1.6 Manrope, system-ui, sans-serif; text-align: center; }
+    b { display: block; font: 600 clamp(5rem, 18vw, 9rem)/1 "Playfair Display", Georgia, serif; color: #E07A5F; }
+    h1 { margin: 12px 0 16px; font: 600 clamp(1.8rem, 4vw, 2.4rem)/1.2 "Playfair Display", Georgia, serif; color: #1B2232; }
+    p { margin: 0 0 28px; color: #6E7586; }
+    a { display: inline-block; padding: 16px 30px; border-radius: 999px; background: #2D6A66; color: #fff;
+        font-weight: 700; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <b>404</b>
+    <h1>Такой страницы нет</h1>
+    <p>Возможно, ссылка устарела. Всё самое важное — на главной.</p>
+    <a id="home" href="/">На главную</a>
+  </main>
+  <script>
+    // На адресе вида имя.github.io/папка/ главная лежит внутри папки
+    if (location.hostname.endsWith("github.io")) {
+      var seg = location.pathname.split("/")[1];
+      if (seg) document.getElementById("home").href = "/" + seg + "/";
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 700">
+  <!-- Заглушка вместо фото. Замени на свою фотографию (см. GUIDE.md) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#BFE4DA"/>
+      <stop offset="1" stop-color="#FFD5C2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".38" r=".5">
+      <stop offset="0" stop-color="#fff" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="560" height="700" fill="url(#bg)"/>
+  <circle cx="280" cy="270" r="250" fill="url(#glow)"/>
+  <circle cx="440" cy="120" r="46" fill="#fff" opacity=".25"/>
+  <circle cx="110" cy="190" r="22" fill="#fff" opacity=".3"/>
+  <g fill="#fff" opacity=".6">
+    <circle cx="280" cy="285" r="92"/>
+    <path d="M80 700c0-160 90-262 200-262s200 102 200 262z"/>
+  </g>
+</svg>
