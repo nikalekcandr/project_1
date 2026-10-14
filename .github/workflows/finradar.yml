@@ -1,0 +1,90 @@
+name: finradar
+
+# Сбор каждые 6 часов + ручной запуск. База SQLite переживает запуски через actions/cache,
+# HTML-отчёт сохраняется артефактом, дайджест уходит в Telegram (если заданы секреты).
+# Важно: раннеры GitHub находятся за пределами РФ — часть российских сайтов может отвечать
+# иначе или блокировать запросы. Для hh.ru/Habr надёжнее self-hosted runner или cron на своём VPS.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: finradar
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      FINRADAR_CONTACT: ${{ secrets.FINRADAR_CONTACT }}
+      HH_ACCESS_TOKEN: ${{ secrets.HH_ACCESS_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SUPERJOB_API_KEY: ${{ secrets.SUPERJOB_API_KEY }}
+      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+      USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+      USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
+      REED_API_KEY: ${{ secrets.REED_API_KEY }}
+      JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install ".[llm]"
+
+      - name: Restore database
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: finradar-db-${{ github.run_id }}
+          restore-keys: finradar-db-
+
+      # Свои конфиги можно закоммитить: git add -f config/sources.yaml config/profile.yaml
+      # (по умолчанию они в .gitignore). Секреты — только через Settings → Secrets.
+      - name: Config (examples unless the repo has its own)
+        run: |
+          [ -f config/sources.yaml ] || cp config/sources.example.yaml config/sources.yaml
+          [ -f config/profile.yaml ] || cp config/profile.example.yaml config/profile.yaml
+
+      - name: Fetch
+        run: finradar fetch || true   # частичный сбой одного источника не должен ронять весь запуск
+
+      - name: LLM enrichment (only if a key is configured)
+        if: env.ANTHROPIC_API_KEY != ''
+        run: finradar enrich --limit 30 || true
+
+      - name: Report
+        run: |
+          finradar report -o reports/index.html
+          finradar export -f csv -o reports/vacancies.csv
+          finradar stats | tee reports/stats.txt
+
+      - name: Telegram digest
+        if: env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+        run: finradar digest --days 1 --min-score 45 --send
+
+      - name: Save database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: finradar-db-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: finradar-report
+          path: reports/
+          retention-days: 14

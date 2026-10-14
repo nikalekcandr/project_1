@@ -1,0 +1,307 @@
+# FinRadar — источники и настройки.
+# Скопируйте в config/sources.yaml (`finradar init`) и включайте/выключайте источники флагом enabled.
+# Секреты задаются через переменные окружения или файл .env: ${VAR} / ${VAR:-по умолчанию}.
+# Проверить, что источник реально отдаёт данные из вашей сети: `finradar doctor -s <name>`.
+
+settings:
+  db: data/finradar.db
+  # Представьтесь честно: e-mail в User-Agent — хороший тон для вежливого сбора.
+  user_agent: "finradar/0.1 (+personal job search; ${FINRADAR_CONTACT:-no-contact})"
+  min_interval: 1.0          # секунд между запросами к одному хосту (по умолчанию)
+  host_intervals:            # отдельные лимиты для чувствительных хостов
+    hh.ru: 2.0
+    career.habr.com: 1.5
+    getmatch.ru: 1.5
+    t.me: 1.0
+  respect_robots: true       # HTML-источники проверяют robots.txt
+  max_workers: 6             # источники опрашиваются параллельно
+  min_relevance: 3.0         # порог «это про финансы/экономику/аналитику»
+  fx:
+    live: true               # курсы ЦБ РФ (cbr.ru/scripts/XML_daily.asp)
+    rates: {}                # ручные переопределения: {USD: 82.5}
+  report_dir: reports
+  telegram:
+    bot_token: ${TELEGRAM_BOT_TOKEN}
+    chat_id: ${TELEGRAM_CHAT_ID}
+  llm:
+    model: claude-opus-5-5
+    effort: low              # классификация и извлечение — low достаточно
+    max_per_run: 50          # сколько лучших новых позиций обогащать за запуск
+    min_score: 40
+
+# Поисковые запросы переиспользуются через YAML-якоря.
+queries:
+  ru: &queries_ru
+    - финансовый аналитик
+    - FP&A
+    - инвестиционный аналитик
+    - M&A
+    - аналитик инвестиционного банка
+    - private equity
+    - венчурный аналитик
+    - финансовый контролер
+    - финансовый менеджер
+    - экономист
+    - макроэкономист
+    - риск-менеджер
+    - кредитный аналитик
+    - аналитик казначейства
+    - портфельный управляющий
+    - аналитик данных
+    - BI аналитик
+    - продуктовый аналитик
+    - бизнес-аналитик
+    - стажер финансы
+  en: &queries_en
+    - financial analyst
+    - FP&A
+    - investment banking analyst
+    - M&A analyst
+    - private equity associate
+    - equity research
+    - economist
+    - quantitative analyst
+    - risk analyst
+    - credit analyst
+    - treasury analyst
+    - data analyst
+    - business analyst
+    - finance internship
+
+sources:
+  # ============================ Россия и СНГ ============================
+
+  # hh.ru. С апреля 2026 анонимный api.hh.ru/vacancies отвечает 403.
+  # mode: auto -> api, если задан HH_ACCESS_TOKEN (токен приложения), иначе вежливый парсинг HTML поиска.
+  - name: hh
+    type: hh
+    enabled: true
+    mode: auto
+    access_token: ${HH_ACCESS_TOKEN}
+    queries: *queries_ru
+    areas: [113]               # 113 — вся Россия, 1 — Москва, 2 — СПб, 40 — Казахстан
+    # professional_roles: [10, 134, 135, 136, 137, 142, 150, 156, 157, 164, 165]  # аналитики/финансы — сверьте по api.hh.ru/professional_roles
+    period_days: 7
+    max_pages: 3
+    max_items: 1500
+
+  - name: hh_kz
+    type: hh
+    enabled: false
+    domain: hh.kz
+    queries: [финансовый аналитик, экономист, аналитик данных]
+    areas: [40]
+
+  # Хабр Карьера — сильна в аналитике данных, BI, продуктовой аналитике и финтехе.
+  - name: habr
+    type: habr
+    enabled: true
+    queries: [аналитик, финансовый аналитик, BI, data analyst, риск, экономист, финтех, FP&A]
+    max_pages: 3
+
+  # GetMatch — ИТ/аналитика/финтех, почти всегда с вилкой. Публичный API getmatch — только для работодателей,
+  # поэтому читаем публичный листинг (JSON-лента сайта, при сбое — HTML).
+  - name: getmatch
+    type: getmatch
+    enabled: true
+    queries: [аналитик, analyst, финансы, data]
+    max_pages: 4
+
+  # Perforum — сообщество финансистов (perforum.io/jobs + Telegram @Perforum_jobs, бывший EMCR_jobs).
+  - name: perforum_tg
+    type: telegram
+    enabled: true
+    channels: [Perforum_jobs]
+    pages: 4
+    max_age_days: 30
+
+  - name: perforum_site
+    type: jsonld_crawler
+    enabled: true
+    start_urls: ["https://perforum.io/jobs"]
+    link_pattern: "/jobs/[^/?#]+/?$"
+    pagination: {param: page, start: 1, max_pages: 3}
+    max_details: 120
+
+  # FinExecutive — финансы, инвестиции, консалтинг; премодерация по уровню зарплаты.
+  - name: finexecutive_tg
+    type: telegram
+    enabled: true
+    channels: [finexecutive]
+    pages: 4
+
+  - name: finexecutive_site
+    type: jsonld_crawler
+    enabled: true
+    start_urls: ["https://finexecutive.com/vacancies"]
+    link_pattern: "/vacanc\\w*/[^/?#]+/?$"
+    max_details: 120
+
+  # Профильные Telegram-каналы. Список — стартовый; проверяйте `finradar doctor -s telegram_finance`
+  # и добавляйте свои (t.me/s/<канал> должен открываться без логина).
+  - name: telegram_finance
+    type: telegram
+    enabled: true
+    channels:
+      - tpeople               # аудит и консалтинг
+      - bankman_20            # банки
+      - careerinconsulting    # консалтинг, Big4
+      - flesspro              # консалтинг
+    pages: 3
+
+  - name: telegram_analytics
+    type: telegram
+    enabled: true
+    channels:
+      - analyst_job
+      - analysts_hunter
+      - data_analyst_jobs
+    pages: 3
+
+  # SuperJob API — бесплатный ключ: https://api.superjob.ru/register
+  - name: superjob
+    type: superjob
+    enabled: false
+    app_key: ${SUPERJOB_API_KEY}
+    queries: [финансовый аналитик, экономист, аналитик]
+    max_pages: 2
+
+  # «Работа России» — открытые данные, без ключа. Много госсектора и крупных компаний; шумно.
+  - name: trudvsem
+    type: trudvsem
+    enabled: false
+    queries: [финансовый аналитик, экономист, аналитик данных]
+    # region_code: 7700000000000   # Москва
+    max_pages: 2
+
+  # ============================ Глобальный рынок ============================
+
+  # Карьерные сайты работодателей через ATS — самый чистый источник по банкам, фондам, трейдинговым
+  # фирмам и финтеху. Список компаний — стартовый: невалидный токен просто даст предупреждение.
+  - name: greenhouse_finance
+    type: greenhouse
+    enabled: true
+    companies: [point72, jumptrading, imc, akunacapital, wehrtyou, stripe, robinhood, coinbase, brex,
+                chime, affirm, nubank, monzo, gemini]
+    names: {wehrtyou: Hudson River Trading, imc: IMC Trading, akunacapital: Akuna Capital}
+
+  - name: lever_finance
+    type: lever
+    enabled: true
+    companies: [binance]
+
+  - name: ashby_finance
+    type: ashby
+    enabled: true
+    companies: [ramp, kraken.com]
+    names: {ramp: Ramp, kraken.com: Kraken}
+
+  - name: smartrecruiters_finance
+    type: smartrecruiters
+    enabled: true
+    companies: [Visa]
+    q: analyst
+
+  - name: workday_finance
+    type: workday
+    enabled: true
+    search: [analyst, economist, finance]
+    companies:
+      - {name: BlackRock, host: blackrock.wd1.myworkdayjobs.com, tenant: blackrock, site: BlackRock_Professional}
+      - {name: Mastercard, host: mastercard.wd1.myworkdayjobs.com, tenant: mastercard, site: CorporateCareers}
+      - {name: Fidelity, host: fmr.wd1.myworkdayjobs.com, tenant: fmr, site: FidelityCareers}
+      - {name: State Street, host: statestreet.wd1.myworkdayjobs.com, tenant: statestreet, site: Global}
+
+  # Бесплатные публичные API бордов (в основном удалёнка).
+  - name: remotive
+    type: remotive
+    enabled: true
+    queries: [finance, financial analyst, economist, data analyst, accounting]
+
+  - name: remoteok
+    type: remoteok
+    enabled: true
+    tags: [finance, accounting, analyst, crypto]
+
+  - name: himalayas
+    type: himalayas
+    enabled: true
+    queries: [financial analyst, economist, FP&A, data analyst]
+    max_items: 300
+
+  - name: jobicy
+    type: jobicy
+    enabled: true
+    industries: [accounting-finance, data-science]
+
+  - name: themuse
+    type: themuse
+    enabled: true
+    categories: ["Accounting and Finance", "Data and Analytics"]
+    max_pages: 5
+
+  - name: arbeitnow
+    type: arbeitnow
+    enabled: false
+    max_pages: 3
+
+  # Официальные API с бесплатными ключами.
+  - name: adzuna
+    type: adzuna
+    enabled: false                 # ключ: https://developer.adzuna.com
+    app_id: ${ADZUNA_APP_ID}
+    app_key: ${ADZUNA_APP_KEY}
+    countries: [gb, us, de, nl, sg]
+    category: accounting-finance-jobs
+    queries: [financial analyst, FP&A, investment analyst, economist]
+    max_pages: 2
+
+  - name: usajobs
+    type: usajobs
+    enabled: false                 # ключ: https://developer.usajobs.gov
+    api_key: ${USAJOBS_API_KEY}
+    email: ${USAJOBS_EMAIL}
+    queries: [economist, financial analyst]
+    job_series: ["0110", "1160"]   # 0110 Economist, 1160 Financial Analysis
+
+  - name: reed
+    type: reed
+    enabled: false                 # ключ: https://www.reed.co.uk/developers
+    api_key: ${REED_API_KEY}
+    queries: [financial analyst, FP&A, economist]
+    location: London
+
+  - name: jooble
+    type: jooble
+    enabled: false                 # ключ: https://jooble.org/api/about
+    api_key: ${JOOBLE_API_KEY}
+    queries: [financial analyst, economist]
+    locations: [London, Dubai, Singapore]
+
+  - name: reliefweb
+    type: reliefweb
+    enabled: false                 # appname нужно согласовать с ReliefWeb (с 01.11.2025)
+    appname: ${RELIEFWEB_APPNAME}
+    queries: [economist, financial analyst, finance officer]
+
+  # Закрытые платформы (LinkedIn, Indeed, eFinancialCareers, Glassdoor) — через ваши собственные
+  # e-mail-алерты: подпишитесь на сохранённые поиски, направьте письма в папку, включите источник.
+  - name: email_alerts
+    type: email_alerts
+    enabled: false
+    host: imap.gmail.com
+    user: ${IMAP_USER}
+    password_env: IMAP_PASSWORD     # для Gmail — пароль приложения
+    folder: JobAlerts
+    days: 7
+    senders:
+      - jobalerts-noreply@linkedin.com
+      - alert@indeed.com
+      - noreply@efinancialcareers.com
+
+  # Любая RSS/Atom-лента (карьерные сайты, YM Careers-борды профессиональных ассоциаций и т.п.).
+  - name: rss_custom
+    type: rss
+    enabled: false
+    feeds: []
+    title_regex: "^(?P<company>[^:]+):\\s*(?P<title>.+)$"

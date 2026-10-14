@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+*.db
+*.db-*
+reports/
+config/sources.yaml
+config/profile.yaml
+config/resume.txt
+.env
+*.egg-info/
+build/
+dist/

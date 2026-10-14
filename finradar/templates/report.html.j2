@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} — рынок финансов и аналитики</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f3f0;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #757470;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --series: #2a78d6; --series-wash: rgba(42,120,214,0.16); --accent-ink: #1c5cab;
+  --good: #006300; --bad: #b42d2d;
+  --chip: #eef3fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222220;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a9890;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --series: #3987e5; --series-wash: rgba(57,135,229,0.22); --accent-ink: #86b6ef;
+    --good: #0ca30c; --bad: #e66767;
+    --chip: #1d2733;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222220;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a9890;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+  --series: #3987e5; --series-wash: rgba(57,135,229,0.22); --accent-ink: #86b6ef;
+  --good: #0ca30c; --bad: #e66767;
+  --chip: #1d2733;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent-ink); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+header.top { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 12px; }
+h3 { font-size: 15px; margin: 0 0 4px; }
+.sub, .muted { color: var(--muted); }
+.sub { font-size: 13px; }
+button.theme { background: var(--surface); color: var(--ink-2); border: 1px solid var(--ring); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; margin: 0 0 8px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 14px 16px; }
+.tile .label { color: var(--ink-2); font-size: 13px; }
+.tile .value { font-size: 28px; font-weight: 600; line-height: 1.2; margin-top: 4px; }
+.tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 16px; min-width: 0; }
+.card p.desc { color: var(--ink-2); font-size: 13px; margin: 0 0 10px; }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg .grid { stroke: var(--grid); stroke-width: 1; }
+svg .axis { stroke: var(--axis); stroke-width: 1; }
+svg .bar { fill: var(--series); }
+svg .band { fill: var(--series); opacity: .35; }
+svg .dot { fill: var(--series); stroke: var(--surface); stroke-width: 2; }
+svg .lbl { fill: var(--ink-2); font-size: 12px; }
+svg .val { fill: var(--ink); font-size: 12px; font-variant-numeric: tabular-nums; }
+svg .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+svg .hit { fill: transparent; }
+svg .mark { outline: none; cursor: default; }
+svg .mark:hover .bar, svg .mark:focus .bar, svg .mark:hover .band, svg .mark:focus .band { filter: brightness(1.15); }
+svg .mark:focus .hit { fill: var(--series-wash); }
+.sm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+figure.sm { margin: 0; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+figure.sm figcaption { display: flex; flex-direction: column; font-size: 13px; margin-bottom: 6px; }
+figure.sm figcaption .muted { font-size: 12px; }
+svg.spark { width: 100%; height: auto; display: block; }
+svg.spark .bar { fill: var(--series); opacity: .55; }
+svg.spark .bar.accent { opacity: 1; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.heat { border: 2px solid var(--surface); }
+table.matrix td:first-child { white-space: nowrap; }
+.scroll { overflow-x: auto; }
+details.twin { margin-top: 8px; font-size: 13px; }
+details.twin summary { color: var(--muted); cursor: pointer; }
+.empty { color: var(--muted); font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 12px; }
+.filters input, .filters select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--ring); background: var(--surface); color: var(--ink); max-width: 100%; }
+.filters input[type=search] { flex: 1 1 260px; }
+.filters label { font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+.chip { display: inline-block; background: var(--chip); color: var(--ink-2); border-radius: 6px; padding: 0 6px; font-size: 11px; margin: 2px 4px 0 0; white-space: nowrap; }
+.new { color: var(--good); font-weight: 600; font-size: 11px; margin-left: 4px; }
+.score { font-weight: 600; font-variant-numeric: tabular-nums; }
+.why { color: var(--muted); font-size: 12px; }
+.pager { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.pager button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--ring); background: var(--surface); color: var(--ink); cursor: pointer; }
+.top-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.top-list li { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 10px 14px; display: grid; grid-template-columns: 52px 1fr; gap: 10px; }
+.top-list .score { font-size: 20px; color: var(--accent-ink); }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-width: 320px; display: none; }
+.method { color: var(--ink-2); font-size: 13px; }
+.method li { margin-bottom: 4px; }
+@media (max-width: 640px) { .tile .value { font-size: 22px; } h1 { font-size: 21px; } td.hide-sm, th.hide-sm { display: none; } }
+@media print { button.theme, .filters, .pager { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>{{ title }}: вакансии и возможности в финансах, экономике и аналитике</h1>
+    <div class="sub">Сформировано {{ generated }} · уникальных активных позиций: {{ fmt_int(ov.active) }} · источников: {{ ov.sources }}</div>
+  </div>
+  <button class="theme" type="button" id="themeBtn">Тема: авто</button>
+</header>
+<nav class="toc">
+  <a href="#top">Лучшие совпадения</a><a href="#explorer">Все вакансии</a><a href="#market">Рынок</a>
+  <a href="#salary">Зарплаты</a><a href="#companies">Работодатели</a><a href="#skills">Навыки</a>
+  <a href="#geo">География и формат</a><a href="#sources">Источники</a><a href="#method">Методология</a>
+</nav>
+
+<section class="kpis" aria-label="Ключевые показатели">
+  <div class="tile"><div class="label">Активных позиций</div><div class="value">{{ fmt_int(ov.active) }}</div><div class="note">после дедупликации; дублей убрано: {{ fmt_int(ov.duplicates) }}</div></div>
+  <div class="tile"><div class="label">Новых за 7 дней</div><div class="value">{{ fmt_int(ov.new_7d) }}</div><div class="note">за 24 ч: {{ fmt_int(ov.new_24h) }} · за 30 дн: {{ fmt_int(ov.new_30d) }}</div></div>
+  <div class="tile"><div class="label">Закрылось за 7 дней</div><div class="value">{{ fmt_int(ov.closed_7d) }}</div><div class="note">пропали из выдачи источника</div></div>
+  <div class="tile"><div class="label">Указана зарплата</div><div class="value">{{ fmt_pct(ov.salary_share) }}</div><div class="note">доля активных позиций</div></div>
+  <div class="tile"><div class="label">Удалённо</div><div class="value">{{ fmt_pct(ov.remote_share) }}</div><div class="note">доля активных позиций</div></div>
+  <div class="tile"><div class="label">Работодателей</div><div class="value">{{ fmt_int(ov.companies) }}</div><div class="note">с активными позициями</div></div>
+</section>
+
+<h2 id="top">Лучшие совпадения с вашим профилем</h2>
+{% if top %}
+<ol class="top-list">
+{% for v in top %}
+  <li>
+    <div class="score" title="Персональный скоринг 0–100">{{ '%.0f'|format(v.score or 0) }}</div>
+    <div>
+      <a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a>
+      {% if v.company %}<span class="muted"> · {{ v.company }}</span>{% endif %}
+      <div class="why">
+        {% if v.salary_fmt %}<span class="chip">{{ v.salary_fmt }}</span>{% endif %}
+        {% if v.domain_label %}<span class="chip">{{ v.domain_label }}</span>{% endif %}
+        {% if v.city or v.location %}<span class="chip">{{ v.city or v.location }}</span>{% endif %}
+        {% if v.work_format %}<span class="chip">{{ format_labels.get(v.work_format, v.work_format) }}</span>{% endif %}
+        <span class="chip">{{ v.source }}</span>
+        {% if v.score_reasons %} · {{ v.score_reasons|join(', ') }}{% endif %}
+      </div>
+    </div>
+  </li>
+{% endfor %}
+</ol>
+{% else %}<p class="empty">Нет данных — запустите <code>finradar fetch</code>.</p>{% endif %}
+
+<h2 id="explorer">Все активные позиции <span class="muted" style="font-size:13px;font-weight:400">({{ fmt_int(explorer_count) }})</span></h2>
+<div class="filters" role="search">
+  <input type="search" id="q" placeholder="Поиск: должность, компания, навык…" aria-label="Поиск">
+  <select id="fDomain" aria-label="Направление"><option value="">Все направления</option>{% for k, lbl in domain_options %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}</select>
+  <select id="fKind" aria-label="Тип"><option value="">Все типы</option>{% for k, lbl in kind_labels.items() %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}</select>
+  <select id="fSen" aria-label="Уровень"><option value="">Любой уровень</option>{% for k, lbl in seniority_labels.items() %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}</select>
+  <select id="fFmt" aria-label="Формат"><option value="">Любой формат</option>{% for k, lbl in format_labels.items() %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}</select>
+  <select id="fSrc" aria-label="Источник"><option value="">Все источники</option>{% for s in source_options %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select>
+  <input type="number" id="fMin" placeholder="от ₽/мес" min="0" step="10000" style="width:120px" aria-label="Минимальная зарплата, ₽ в месяц">
+  <label><input type="checkbox" id="fSal"> с зарплатой</label>
+  <label><input type="checkbox" id="fNew"> новые (7 дн)</label>
+  <select id="sort" aria-label="Сортировка"><option value="score">По скорингу</option><option value="date">По дате</option><option value="salary">По зарплате</option></select>
+</div>
+<div class="card scroll">
+  <table id="vt">
+    <thead><tr><th class="num">Скор</th><th>Позиция</th><th class="hide-sm">Направление</th><th>Зарплата</th><th class="hide-sm">Локация</th><th class="hide-sm">Источник</th><th class="num hide-sm">Дата</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="pager"><button type="button" id="prev">←</button><span id="pinfo"></span><button type="button" id="next">→</button></div>
+</div>
+
+<h2 id="market">Рынок</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>Активные позиции по направлениям</h3>
+    <p class="desc">Уникальные позиции (кросспостинг посчитан один раз).</p>
+    {{ charts.domains }}
+    <details class="twin"><summary>Таблица</summary><table><tr><th>Направление</th><th class="num">Позиций</th></tr>{% for k, v in tables.domains %}<tr><td>{{ k }}</td><td class="num">{{ fmt_int(v) }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card">
+    <h3>Динамика рынка: где спрос растёт</h3>
+    <p class="desc">Новые позиции за последние 7 дней против средней недели за предыдущие 8. Индекс &gt; 1 — ускорение.</p>
+    <div class="scroll"><table>
+      <tr><th>Направление</th><th class="num">7 дней</th><th class="num">Средняя неделя</th><th class="num">Индекс</th></tr>
+      {% for h in rep.heat %}<tr><td>{{ short_label(h.domain) }}</td><td class="num">{{ h.last_7d }}</td><td class="num">{{ h.avg_week }}</td><td class="num">{{ h.heat if h.heat is not none else '—' }}</td></tr>{% endfor %}
+    </table></div>
+  </div>
+</div>
+<div class="card" style="margin-top:16px">
+  <h3>Новые позиции по неделям</h3>
+  <p class="desc">Малые мультипликаторы: у каждого направления своя шкала (подписан пик), последняя неделя выделена. Неполная текущая неделя ниже обычного — это нормально.</p>
+  {{ charts.trend }}
+  <details class="twin"><summary>Таблица</summary><div class="scroll"><table><tr><th>Направление</th>{% for w in rep.trend.weeks %}<th class="num">{{ w[5:] }}</th>{% endfor %}</tr>{% for k, vals in rep.trend.series.items() %}<tr><td>{{ 'Остальные' if k == 'rest' else domain_label(k) }}</td>{% for v in vals %}<td class="num">{{ v }}</td>{% endfor %}</tr>{% endfor %}</table></div></details>
+</div>
+
+<h2 id="salary">Зарплаты</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>Россия и СНГ: ₽ в месяц на руки</h3>
+    <p class="desc">Точка — медиана, полоса — от 25-го до 75-го перцентиля. Gross пересчитан в net по 13%, годовые суммы — в месячные.</p>
+    {{ charts.salary_domestic }}
+    <details class="twin"><summary>Таблица</summary><table><tr><th>Направление</th><th class="num">n</th><th class="num">P25</th><th class="num">Медиана</th><th class="num">P75</th></tr>{% for r in rep.salary_domestic %}<tr><td>{{ domain_label(r.group) }}</td><td class="num">{{ r.n }}</td><td class="num">{{ fmt_compact(r.p25) }}</td><td class="num">{{ fmt_compact(r.median) }}</td><td class="num">{{ fmt_compact(r.p75) }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card">
+    <h3>Глобальный рынок: USD в год, gross</h3>
+    <p class="desc">Позиции в USD/EUR/GBP/AED и др., пересчёт по курсу ЦБ РФ на дату сбора.</p>
+    {{ charts.salary_global }}
+    <details class="twin"><summary>Таблица</summary><table><tr><th>Направление</th><th class="num">n</th><th class="num">P25</th><th class="num">Медиана</th><th class="num">P75</th></tr>{% for r in rep.salary_global %}<tr><td>{{ domain_label(r.group) }}</td><td class="num">{{ r.n }}</td><td class="num">{{ fmt_compact(r.p25, 'USD') }}</td><td class="num">{{ fmt_compact(r.median, 'USD') }}</td><td class="num">{{ fmt_compact(r.p75, 'USD') }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card">
+    <h3>Зарплата по уровню (₽/мес на руки)</h3>
+    {{ charts.salary_seniority }}
+  </div>
+</div>
+  <div class="card" style="margin-top:16px">
+    <h3>Карта компенсаций: направление × уровень</h3>
+    <p class="desc">Медиана, ₽/мес на руки. Чем темнее ячейка, тем выше.</p>
+    {% if matrix_rows %}
+    <div class="scroll"><table class="matrix">
+      <tr><th>Направление</th>{% for c in seniority_cols %}<th class="num">{{ c }}</th>{% endfor %}</tr>
+      {% for r in matrix_rows %}<tr><td>{{ r.label }}</td>{% for c in r.cells %}{{ c }}{% endfor %}</tr>{% endfor %}
+    </table></div>
+    {% else %}<p class="empty">Недостаточно данных</p>{% endif %}
+  </div>
+{% if rep.salary_changes.changes %}
+<p class="sub">Изменения зарплат в живых вакансиях за 60 дней: {{ rep.salary_changes.changes }} правок в {{ rep.salary_changes.postings }} вакансиях (повышений: {{ rep.salary_changes.raised }}, понижений: {{ rep.salary_changes.lowered }}). Повышение вилки — частый признак трудно закрываемой позиции.</p>
+{% endif %}
+
+<h2 id="companies">Работодатели</h2>
+<div class="card scroll">
+  <p class="desc">Импульс — новые позиции за 14 дней минус предыдущие 14: кто сейчас активно нанимает.</p>
+  <table>
+    <tr><th>Компания</th><th class="num">Активных</th><th class="num">Новых за 14 дн</th><th class="num">Импульс</th><th class="hide-sm">Основное направление</th><th class="num">Медиана ₽/мес</th></tr>
+    {% for c in rep.companies %}<tr><td>{{ c.company }}</td><td class="num">{{ c.active }}</td><td class="num">{{ c.new_14d }}</td><td class="num">{{ '%+d'|format(c.momentum) }}</td><td class="hide-sm">{{ short_label(c.top_domain) }}</td><td class="num">{{ fmt_compact(c.median_rub) if c.median_rub else '—' }}</td></tr>{% endfor %}
+  </table>
+</div>
+
+<h2 id="skills">Навыки и сертификаты</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>Доля позиций, где упоминается навык</h3>
+    {{ charts.skills }}
+  </div>
+  <div class="card scroll">
+    <h3>Премия за навык</h3>
+    <p class="desc">Медиана зарплаты (₽/мес) в позициях с навыком против медианы по всем позициям с зарплатой. Корреляция, не причинность: навык часто идёт вместе с уровнем.</p>
+    <table><tr><th>Навык</th><th class="num">Позиций</th><th class="num">Доля</th><th class="num">Медиана</th><th class="num">Премия</th></tr>
+    {% for s in skills %}<tr><td>{{ s.skill }}</td><td class="num">{{ s.count }}</td><td class="num">{{ fmt_pct(s.share) }}</td><td class="num">{{ fmt_compact(s.median_rub) if s.median_rub else '—' }}</td><td class="num">{{ ('%+.0f%%'|format(s.premium * 100)) if s.premium is not none else '—' }}</td></tr>{% endfor %}
+    </table>
+  </div>
+</div>
+
+<h2 id="geo">География, формат, уровень и тип</h2>
+<div class="grid2">
+  <div class="card"><h3>Города</h3>{{ charts.cities }}<details class="twin"><summary>Таблица</summary><table>{% for k, v in tables.cities %}<tr><td>{{ k }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table></details></div>
+  <div class="card"><h3>Формат работы</h3>{{ charts.formats }}<details class="twin"><summary>Таблица</summary><table>{% for k, v in tables.formats %}<tr><td>{{ k }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table></details></div>
+  <div class="card"><h3>Уровень позиции</h3>{{ charts.seniority }}<details class="twin"><summary>Таблица</summary><table>{% for k, v in tables.seniority %}<tr><td>{{ k }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table></details></div>
+  <div class="card"><h3>Тип возможности</h3>{{ charts.kinds }}<details class="twin"><summary>Таблица</summary><table>{% for k, v in tables.kinds %}<tr><td>{{ k }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table></details></div>
+</div>
+
+<h2 id="sources">Качество источников</h2>
+<div class="card scroll">
+  <p class="desc">Эксклюзивность — доля позиций, которых нет ни в одном другом источнике: показывает, без каких источников вы бы что-то пропустили.</p>
+  <table>
+    <tr><th>Источник</th><th class="num">Активных</th><th class="num">Эксклюзивных</th><th class="num">С зарплатой</th><th class="num">Медианный возраст, дн</th><th class="num hide-sm">Релевантность</th><th>Последний запуск</th></tr>
+    {% for s in rep.sources %}<tr><td>{{ s.source }}</td><td class="num">{{ s.active }}</td><td class="num">{{ fmt_pct(s.exclusive_share) }}</td><td class="num">{{ fmt_pct(s.salary_share) }}</td><td class="num">{{ s.median_age_days if s.median_age_days is not none else '—' }}</td><td class="num hide-sm">{{ s.avg_relevance if s.avg_relevance is not none else '—' }}</td><td>{{ s.last_status or '—' }} <span class="muted">{{ (s.last_run or '')[:16]|replace('T', ' ') }}</span></td></tr>{% endfor %}
+  </table>
+</div>
+{% if rep.lifetime %}
+<div class="card scroll" style="margin-top:16px">
+  <h3>Сколько живут вакансии (прокси времени закрытия)</h3>
+  <table><tr><th>Направление</th><th class="num">Закрытых</th><th class="num">Медиана, дней</th><th class="num">Закрыты за ≤7 дней</th></tr>
+  {% for r in rep.lifetime %}<tr><td>{{ domain_label(r.domain) }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.median_days }}</td><td class="num">{{ fmt_pct(r.closed_within_7d) }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<h2 id="method">Методология</h2>
+<ul class="method">
+  <li><b>Дедупликация.</b> Позиция, опубликованная на нескольких площадках, объединяется в кластер (компания + нормализованное название, либо схожесть текста ≥ 50% по шинглам). Во всех цифрах кластер считается один раз; показывается версия из самого информативного источника.</li>
+  <li><b>Направления</b> определяются взвешенными правилами по названию (×3), тегам (×2) и описанию (×1); позиции вне финансов, экономики и аналитики отсекаются порогом релевантности.</li>
+  <li><b>Зарплаты</b> разделены на два рынка: рублёвый и сопоставимые (₽/мес на руки) и глобальный (USD/год gross). Смешивать их некорректно. Gross → net для ₽ по ставке 13% (приближение).</li>
+  <li><b>Закрытие</b> позиции фиксируется, когда она пропала из полного листинга источника; для Telegram, RSS и почтовых алертов — по сроку жизни (TTL).</li>
+  <li><b>Скоринг</b> 0–100 считается по config/profile.yaml: направление, ключевые слова, уровень, зарплата, локация/формат, свежесть.</li>
+</ul>
+</div>
+<div id="tip" role="tooltip"></div>
+<script>
+(function () {
+  // Theme toggle: auto -> light -> dark
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  var names = {auto: 'авто', light: 'светлая', dark: 'тёмная'};
+  function apply(t) { if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t); btn.textContent = 'Тема: ' + names[t]; }
+  var cur = 'auto';
+  try { cur = localStorage.getItem('finradar-theme') || 'auto'; } catch (e) {}
+  apply(cur);
+  btn.addEventListener('click', function () {
+    cur = cur === 'auto' ? 'light' : cur === 'light' ? 'dark' : 'auto';
+    apply(cur);
+    try { localStorage.setItem('finradar-theme', cur); } catch (e) {}
+  });
+
+  // Tooltips for chart marks (hover + keyboard focus)
+  var tip = document.getElementById('tip');
+  function show(el, x, y) { tip.textContent = el.getAttribute('data-tip'); tip.style.display = 'block';
+    var w = tip.offsetWidth; tip.style.left = Math.min(x + 14, window.innerWidth - w - 8) + 'px'; tip.style.top = (y + 14) + 'px'; }
+  function hide() { tip.style.display = 'none'; }
+  document.querySelectorAll('[data-tip]').forEach(function (el) {
+    el.addEventListener('pointermove', function (e) { show(el, e.clientX, e.clientY); });
+    el.addEventListener('pointerleave', hide);
+    el.addEventListener('focus', function () { var r = el.getBoundingClientRect(); show(el, r.left + r.width / 2, r.top); });
+    el.addEventListener('blur', hide);
+  });
+
+  // Explorer
+  var DATA = {{ explorer_json }};
+  var L = {{ labels_json }};
+  var $ = function (id) { return document.getElementById(id); };
+  var tbody = document.querySelector('#vt tbody'), page = 0, PER = 50, view = [];
+  function td(text, cls) { var c = document.createElement('td'); if (cls) c.className = cls; c.textContent = text; return c; }
+  function filter() {
+    var q = $('q').value.trim().toLowerCase(), dom = $('fDomain').value, kind = $('fKind').value, sen = $('fSen').value,
+        fmt = $('fFmt').value, src = $('fSrc').value, min = parseFloat($('fMin').value) || 0,
+        sal = $('fSal').checked, onlyNew = $('fNew').checked, sort = $('sort').value;
+    var terms = q ? q.split(/\s+/) : [];
+    view = DATA.filter(function (r) {
+      if (dom && r.dk !== dom) return false;
+      if (kind && r.k !== kind) return false;
+      if (sen && r.s !== sen) return false;
+      if (fmt && r.f !== fmt) return false;
+      if (src && r.src !== src) return false;
+      if (sal && !r.sal) return false;
+      if (min && !(r.rub && r.rub >= min)) return false;
+      if (onlyNew && !r.new) return false;
+      if (terms.length) {
+        var hay = (r.t + ' ' + r.c + ' ' + r.l + ' ' + r.d + ' ' + r.sk.join(' ')).toLowerCase();
+        for (var i = 0; i < terms.length; i++) if (hay.indexOf(terms[i]) < 0) return false;
+      }
+      return true;
+    });
+    view.sort(function (a, b) {
+      if (sort === 'date') return (b.pub || '').localeCompare(a.pub || '');
+      if (sort === 'salary') return (b.rub || 0) - (a.rub || 0);
+      return (b.score || 0) - (a.score || 0);
+    });
+    page = 0; draw();
+  }
+  function draw() {
+    tbody.textContent = '';
+    var start = page * PER, rows = view.slice(start, start + PER);
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.appendChild(td((r.score || 0).toFixed(0), 'num score'));
+      var cell = document.createElement('td'), a = document.createElement('a');
+      a.href = r.u; a.target = '_blank'; a.rel = 'noopener'; a.textContent = r.t; cell.appendChild(a);
+      if (r.new) { var n = document.createElement('span'); n.className = 'new'; n.textContent = 'new'; cell.appendChild(n); }
+      var meta = document.createElement('div'); meta.className = 'why';
+      meta.textContent = [r.c, L.s[r.s], L.f[r.f], r.k !== 'vacancy' ? L.k[r.k] : ''].filter(Boolean).join(' · ');
+      cell.appendChild(meta);
+      if (r.why && r.why.length) { var w = document.createElement('div'); w.className = 'why'; w.textContent = r.why.join(', '); cell.appendChild(w); }
+      tr.appendChild(cell);
+      tr.appendChild(td(r.d, 'hide-sm'));
+      tr.appendChild(td(r.sal || '—'));
+      tr.appendChild(td(r.l || '—', 'hide-sm'));
+      tr.appendChild(td(r.src, 'hide-sm'));
+      tr.appendChild(td(r.pub, 'num hide-sm'));
+      tbody.appendChild(tr);
+    });
+    var pages = Math.max(1, Math.ceil(view.length / PER));
+    $('pinfo').textContent = 'Найдено: ' + view.length + ' · стр. ' + (page + 1) + ' из ' + pages;
+    $('prev').disabled = page === 0; $('next').disabled = page + 1 >= pages;
+  }
+  ['q', 'fDomain', 'fKind', 'fSen', 'fFmt', 'fSrc', 'fMin', 'fSal', 'fNew', 'sort'].forEach(function (id) {
+    $(id).addEventListener(id === 'q' || id === 'fMin' ? 'input' : 'change', filter);
+  });
+  $('prev').addEventListener('click', function () { if (page > 0) { page--; draw(); } });
+  $('next').addEventListener('click', function () { page++; draw(); });
+  filter();
+})();
+</script>
+</body>
+</html>

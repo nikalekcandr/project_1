@@ -1,0 +1,80 @@
+# Ваш профиль: от него зависит персональный скоринг 0–100 и порядок в дайджесте.
+# После правки: `finradar rescore` (пересчитает без повторного сбора).
+
+profile:
+  # Насколько вам интересно направление (0..1). Ключи: см. finradar/taxonomy.py → DOMAIN_LABELS.
+  domains:
+    corp_finance: 1.0        # FP&A, контроллинг, корпоративные финансы
+    ib_ma: 1.0               # инвестбанкинг, M&A, corporate development
+    pe_vc: 0.9               # private equity, венчур
+    asset_mgmt: 0.8          # управление активами, research
+    economics: 0.8           # экономика, макро, исследования
+    risk: 0.6
+    credit: 0.6
+    sales_trading: 0.5
+    quant: 0.5
+    data_analytics: 0.6
+    business_analysis: 0.6
+    fintech_crypto: 0.5
+    accounting_audit: 0.2
+    compliance: 0.2
+    insurance_actuarial: 0.2
+    other: 0.3
+
+  # Множитель по типу возможности.
+  kinds:
+    vacancy: 1.0
+    internship: 0.7
+    graduate_program: 0.8
+    fellowship: 0.7
+    academic: 0.5
+    grant: 0.5
+    competition: 0.5
+    event: 0.3
+
+  # Желаемые уровни: intern, junior, middle, senior, lead, head, c_level
+  seniority: [junior, middle, senior]
+
+  # Ключевые слова с весом: в названии считаются ×2. Префикс "re:" — регулярное выражение.
+  keywords:
+    "FP&A": 3
+    "M&A": 3
+    "financial model": 2
+    "финансовая модель": 2
+    "финансовое моделирование": 2
+    "valuation": 2
+    "оценка бизнеса": 2
+    "DCF": 1.5
+    "LBO": 1.5
+    "МСФО": 1
+    "IFRS": 1
+    "Python": 1
+    "SQL": 1
+    "Power BI": 1
+    "CFA": 1
+    "re:\\bpe\\b|private equity": 2
+
+  # Штрафы.
+  negative_keywords:
+    "кассир": 20
+    "продаж": 5
+    "холодные звонки": 20
+    "call-центр": 20
+    "1С-программист": 10
+    "re:бухгалтер(?!.*мсфо)": 6
+
+  # Целевая зарплата: позиции ниже 80% от цели штрафуются, без зарплаты — нейтрально.
+  min_salary:
+    rub_month: 200000         # ₽/мес на руки
+    usd_year: 70000           # USD/год gross для зарубежных позиций
+
+  # Предпочтительные локации (подстрока в городе/стране/локации) и форматы работы (0..1).
+  locations: [Москва, Санкт-Петербург, Дубай, Лондон, Remote]
+  work_format:
+    remote: 1.0
+    hybrid: 0.8
+    office: 0.6
+
+  languages: [ru, en]
+  favorite_companies: []      # +8 к скорингу
+  exclude_companies: []       # скрыть полностью
