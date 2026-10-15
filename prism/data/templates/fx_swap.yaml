@@ -1,0 +1,31 @@
+meta:
+  name: "Валютный своп"
+  asset_class: fx
+  group: "Валютные"
+  description: "Ближняя и дальняя ноги с противоположным направлением; неравные номиналы допустимы."
+  params:
+    trade_id: {type: str, default: "FXS-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    pair: {type: str, default: "CNYRUB"}
+    near_notional: {type: float, default: 10000000}
+    far_notional: {type: float, default: 10000000}
+    near_date: {type: date, default: "2026-10-20"}
+    far_date: {type: date, default: "2027-04-20"}
+    near_rate: {type: float, default: 11.53}
+    far_rate: {type: float, default: 12.05}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Валютный своп {{ pair }}"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  settlement: {type: physical, currency: RUB}
+  legs:
+    - name: near
+      underlying: X
+      schedule: {dates: ["{{ near_date|d }}"], calendar: "RU+CN"}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ near_notional }}}
+      components: [{kind: forward, strike: {{ near_rate }}, position: short}]
+    - name: far
+      underlying: X
+      schedule: {dates: ["{{ far_date|d }}"], calendar: "RU+CN"}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ far_notional }}}
+      components: [{kind: forward, strike: {{ far_rate }}, position: long}]

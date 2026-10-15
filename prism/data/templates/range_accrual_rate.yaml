@@ -1,0 +1,27 @@
+meta:
+  name: "Range accrual на ключевую ставку"
+  asset_class: rate
+  group: "Процентные"
+  description: "Купон за дни, когда ставка в диапазоне; правило нерабочих дней — параметр. Монте-Карло Hull-White."
+  params:
+    trade_id: {type: str, default: "RAR-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 500000000}
+    coupon: {type: float, default: 0.17}
+    lower: {type: float, default: 0.12}
+    upper: {type: float, default: 0.16}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 2}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Range accrual на КС {{ lower }}–{{ upper }}"
+  purpose: {type: investment}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  model: {paths: 20000}
+  legs:
+    - name: coupon
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components:
+        - {kind: fixed, rate: {{ coupon }}, modifiers: [{type: accrual, lower: {{ lower }}, upper: {{ upper }}, proportion: days, holiday_rule: previous}]}

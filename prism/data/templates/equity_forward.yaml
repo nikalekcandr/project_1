@@ -1,0 +1,23 @@
+meta:
+  name: "Форвард на акцию / индекс"
+  asset_class: equity
+  group: "Долевые"
+  description: "Нужны дивидендная кривая (дискретные дивиденды) и ставка заимствования бумаги."
+  params:
+    trade_id: {type: str, default: "EQF-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    asset: {type: str, default: "SBER"}
+    shares: {type: float, default: 1000000}
+    price: {type: float, default: 310.0}
+    date: {type: date, default: "2027-09-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Форвард на {{ asset }} {{ price }}"
+  underlyings: {S: {asset_class: equity, id: "{{ asset }}"}}
+  legs:
+    - name: fwd
+      underlying: S
+      currency: RUB
+      schedule: {dates: ["{{ date|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ shares }}}
+      components: [{kind: forward, strike: {{ price }}}]

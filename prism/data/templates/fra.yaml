@@ -1,0 +1,21 @@
+meta:
+  name: "FRA на RUSFAR 3M"
+  asset_class: rate
+  group: "Процентные"
+  description: "Соглашение о будущей ставке на период."
+  params:
+    trade_id: {type: str, default: "FRA-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    rate: {type: float, default: 0.145}
+    start: {type: date, default: "2027-01-18"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "FRA RUSFAR3M {{ start }}"
+  underlyings: {R: {asset_class: rate, id: RUSFAR3M}}
+  legs:
+    - name: fra
+      underlying: R
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 3)|d }}", frequency: once, calendar: RU, fixing_in_arrears: false, fixing_lag: 1}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: float, position: long}, {kind: fixed, rate: {{ rate }}, position: short}]

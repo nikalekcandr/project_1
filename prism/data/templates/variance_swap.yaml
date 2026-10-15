@@ -1,0 +1,24 @@
+meta:
+  name: "Variance swap"
+  asset_class: volatility
+  group: "Волатильность"
+  description: "Оценивается статической репликацией по страйкам, а не моделью; выводится ошибка дискретизации при разреженной поверхности."
+  params:
+    trade_id: {type: str, default: "VS-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    asset: {type: str, default: "SBER"}
+    vega_notional: {type: float, default: 1000000, label: "Вега-номинал, руб. на 1 п. волатильности"}
+    strike_vol: {type: float, default: 0.30}
+    maturity: {type: date, default: "2027-06-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Variance swap {{ asset }}, страйк {{ (strike_vol*100)|round(1) }}%"
+  underlyings: {S: {asset_class: equity, id: "{{ asset }}"}}
+  legs:
+    - name: var
+      underlying: S
+      observable: {type: realized_variance, name: S, annualization: 252}
+      currency: RUB
+      schedule: {start: "2026-10-15", dates: ["{{ maturity|d }}"], calendar: RU, observation: daily}
+      notional: {currency: RUB, amount: {{ vega_notional / (2 * strike_vol) * 100 }}}
+      components: [{kind: variance, strike: {{ strike_vol ** 2 }}}]

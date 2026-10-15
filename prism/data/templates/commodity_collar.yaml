@@ -1,0 +1,27 @@
+meta:
+  name: "Товарный коллар нулевой стоимости"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Массовая конструкция производителя: купленный пут на среднее, проданный колл."
+  params:
+    trade_id: {type: str, default: "CCOL-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    asset: {type: str, default: "BRENT"}
+    volume: {type: float, default: 100000}
+    put_strike: {type: float, default: 62.0}
+    call_strike: {type: float, default: 75.0}
+    start: {type: date, default: "2027-01-01"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Коллар {{ asset }} {{ put_strike }}–{{ call_strike }}"
+  purpose: {type: sell_commodity}
+  underlyings: {B: {asset_class: commodity, id: "{{ asset }}"}}
+  legs:
+    - name: collar
+      underlying: B
+      currency: USD
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: WEEKENDS, observation: daily, payment_lag: 5}
+      notional: {currency: USD, amount: {{ volume }}}
+      modifiers: [{type: averaging, method: arithmetic}]
+      components: [{kind: put, strike: {{ put_strike }}, position: long}, {kind: call, strike: {{ call_strike }}, position: short}]

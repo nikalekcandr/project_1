@@ -1,0 +1,27 @@
+meta:
+  name: "Leveraged forward"
+  asset_class: fx
+  group: "Валютные"
+  description: "Курс лучше рыночного форварда в обмен на обязанность купить удвоенный объём при неблагоприятном для клиента движении. Основной источник крупных убытков клиентов."
+  params:
+    trade_id: {type: str, default: "LEV-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 85.4}
+    leverage: {type: float, default: 2.0}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 12}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Leveraged forward {{ pair }} {{ strike }} ×{{ leverage }}"
+  purpose: {type: buy_fx, exposure_notional: {{ notional * months }}}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  legs:
+    - name: strip
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: call, strike: {{ strike }}, position: long}
+        - {kind: put, strike: {{ strike }}, position: short, modifiers: [{type: leverage, factor: {{ leverage }}, when: below, threshold: {{ strike }}}]}

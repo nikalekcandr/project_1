@@ -1,0 +1,28 @@
+meta:
+  name: "Структурный депозит (депозит + опцион на курс)"
+  asset_class: fx
+  group: "Структурные"
+  description: "Гарантированная минимальная ставка + участие в росте юаня. Разложить на депозит и опцион; сравнить с обычным депозитом той же срочности."
+  params:
+    trade_id: {type: str, default: "SD-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    amount: {type: float, default: 100000000}
+    min_rate: {type: float, default: 0.05}
+    participation: {type: float, default: 1.0}
+    maturity: {type: date, default: "2027-10-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Структурный депозит: {{ (min_rate*100)|round(1) }}% + участие в CNY/RUB"
+  purpose: {type: investment}
+  premium: {amount: {{ amount }}, currency: RUB, payer: client}
+  underlyings: {X: {asset_class: fx, id: CNYRUB}}
+  legs:
+    - name: deposit
+      underlying: X
+      observable: {type: performance, name: X, initial: 11.52}
+      currency: RUB
+      schedule: {dates: ["{{ maturity|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ amount }}}
+      components:
+        - {kind: redemption, payout: {{ 1 + min_rate }}, label: "депозитная часть"}
+        - {kind: call, strike: {{ 1 + min_rate }}, gearing: {{ participation }}, label: "опционная часть"}

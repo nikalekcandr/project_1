@@ -1,0 +1,26 @@
+meta:
+  name: "Азиатский валютный опцион"
+  asset_class: fx
+  group: "Валютные"
+  description: "Опцион на средний курс за период — под регулярную валютную выручку. Веса фиксингов и правило пропусков задаются явно."
+  params:
+    trade_id: {type: str, default: "ASN-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    pair: {type: str, default: "USDRUB"}
+    option: {type: str, default: "put", choices: [call, put]}
+    notional: {type: float, default: 5000000}
+    strike: {type: float, default: 86.0}
+    avg_start: {type: date, default: "2027-01-01"}
+    avg_end: {type: date, default: "2027-03-31"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Азиатский {{ option }} {{ pair }} (среднее {{ avg_start }}–{{ avg_end }})"
+  purpose: {type: "{{ 'buy_fx' if option == 'call' else 'sell_fx' }}"}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  legs:
+    - name: asian
+      underlying: X
+      schedule: {start: "{{ avg_start|d }}", dates: ["{{ avg_end|d }}"], calendar: RU, observation: daily, payment_lag: 2}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      modifiers: [{type: averaging, method: arithmetic, average_of: price}]
+      components: [{kind: "{{ option }}", strike: {{ strike }}}]

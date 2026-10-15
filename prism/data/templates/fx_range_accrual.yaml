@@ -1,0 +1,27 @@
+meta:
+  name: "Range accrual на курс"
+  asset_class: fx
+  group: "Валютные"
+  description: "Купон начисляется за дни, когда курс в диапазоне; ежедневное наблюдение."
+  params:
+    trade_id: {type: str, default: "RA-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    pair: {type: str, default: "CNYRUB"}
+    notional: {type: float, default: 100000000, label: "Номинал, руб."}
+    coupon: {type: float, default: 0.20, label: "Ставка купона годовая"}
+    lower: {type: float, default: 11.0}
+    upper: {type: float, default: 12.2}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Range accrual {{ pair }} {{ lower }}–{{ upper }}"
+  purpose: {type: investment}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: coupon
+      underlying: X
+      currency: RUB
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 3M, calendar: RU, observation: daily}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: fixed, rate: {{ coupon }}, modifiers: [{type: accrual, lower: {{ lower }}, upper: {{ upper }}, proportion: days}]}]

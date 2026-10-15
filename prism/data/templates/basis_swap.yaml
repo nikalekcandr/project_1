@@ -1,0 +1,27 @@
+meta:
+  name: "Базисный своп КС / RUONIA"
+  asset_class: rate
+  group: "Процентные"
+  description: "Два плавающих индекса, спред на одной ноге (КС/RUONIA, КС/RUSFAR, RUONIA/RUSFAR)."
+  params:
+    trade_id: {type: str, default: "BAS-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    spread: {type: float, default: 0.0030}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 2}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Базисный своп RUONIA+{{ (spread*1e4)|round(1) }} б.п. / КС"
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}, R: {asset_class: rate, id: RUONIA}}
+  legs:
+    - name: ruonia
+      underlying: R
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: float, spread: {{ spread }}, position: long}]
+    - name: keyrate
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: float, position: short}]

@@ -1,0 +1,31 @@
+meta:
+  name: "Процентный своп на ключевую ставку (IRS fixed-float)"
+  asset_class: rate
+  group: "Процентные"
+  description: "Основной инструмент рынка: клиент платит фиксированную ставку, получает ключевую ставку (простое среднее). Амортизация задаётся графиком."
+  params:
+    trade_id: {type: str, default: "IRS-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    fixed_rate: {type: float, default: 0.14}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 3}
+    frequency: {type: str, default: 3M}
+    side: {type: str, default: "pay_fixed", choices: [pay_fixed, receive_fixed]}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "IRS на КС {{ years }}Y, фикс. {{ fixed_rate }}"
+  purpose: {type: "{{ 'pay_floating' if side == 'pay_fixed' else 'receive_floating' }}"}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  legs:
+    - name: fixed
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: "{{ frequency }}", calendar: RU, daycount: ACT/365F}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: fixed, rate: {{ fixed_rate }}, position: "{{ 'short' if side == 'pay_fixed' else 'long' }}"}]
+    - name: float
+      underlying: KS
+      observable: {type: rate, index: KEYRATE, compounding: simple_average}
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: "{{ frequency }}", calendar: RU, daycount: ACT/365F}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: float, position: "{{ 'long' if side == 'pay_fixed' else 'short' }}"}]

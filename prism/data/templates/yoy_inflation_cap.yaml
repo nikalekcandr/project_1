@@ -1,0 +1,23 @@
+meta:
+  name: "Кэп на годовую инфляцию (YoY)"
+  asset_class: inflation
+  group: "Инфляционные"
+  description: "Каплеты на годовой темп ИПЦ; требуется поправка на выпуклость (модельный параметр)."
+  params:
+    trade_id: {type: str, default: "YOY-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    notional: {type: float, default: 1000000000}
+    strike: {type: float, default: 0.07}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 3}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "YoY-кэп на ИПЦ {{ strike }}"
+  underlyings: {CPI: {asset_class: inflation, id: RU.CPI}}
+  legs:
+    - name: caplets
+      underlying: CPI
+      observable: {type: cpi, name: RU.CPI, lag_months: 3, measure: yoy}
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 1Y, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: cap, strike: {{ strike }}}]

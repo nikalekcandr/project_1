@@ -1,0 +1,26 @@
+meta:
+  name: "Ванильный валютный опцион"
+  asset_class: fx
+  group: "Валютные"
+  description: "Европейский колл/пут, Garman-Kohlhagen с волатильностью на страйке (улыбка)."
+  params:
+    trade_id: {type: str, default: "OPT-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    option: {type: str, default: "call", choices: [call, put]}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 90.0}
+    expiry: {type: date, default: "2027-04-15"}
+    premium: {type: float, default: 0.0, label: "Премия, руб."}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Ванильный {{ option }} {{ pair }}"
+  purpose: {type: "{{ 'buy_fx' if option == 'call' else 'sell_fx' }}"}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  premium: {amount: {{ premium }}, currency: RUB, payer: client}
+  legs:
+    - name: option
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components: [{kind: "{{ option }}", strike: {{ strike }}}]

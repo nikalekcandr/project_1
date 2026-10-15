@@ -1,0 +1,25 @@
+meta:
+  name: "Кредит по КС со встроенным флором"
+  asset_class: rate
+  group: "Структурные"
+  description: "Кредит под КС + маржа с минимальной ставкой: встроенный проданный клиентом флор, часто скрыт в кредитном договоре."
+  params:
+    trade_id: {type: str, default: "LOAN-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    margin: {type: float, default: 0.025}
+    floor: {type: float, default: 0.14, label: "Минимальная ставка (на КС)"}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 3}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Кредит КС+{{ (margin*100)|round(2) }}% с флором {{ floor }}"
+  purpose: {type: funding}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  legs:
+    - name: interest
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      exchange_notional: both
+      components: [{kind: float, spread: {{ margin }}, position: short, modifiers: [{type: cap_floor, local_floor: {{ floor + margin }}}]}]

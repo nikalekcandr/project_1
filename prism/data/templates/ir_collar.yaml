@@ -1,0 +1,24 @@
+meta:
+  name: "Процентный коллар"
+  asset_class: rate
+  group: "Процентные"
+  description: "Купленный кэп + проданный флор, обычно нулевой стоимости — ванильная альтернатива барьерному кэпу."
+  params:
+    trade_id: {type: str, default: "IRC-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    cap: {type: float, default: 0.15}
+    floor: {type: float, default: 0.11}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 3}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Процентный коллар КС {{ floor }}–{{ cap }}"
+  purpose: {type: pay_floating}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  legs:
+    - name: collar
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: cap, strike: {{ cap }}, position: long}, {kind: floor, strike: {{ floor }}, position: short}]

@@ -1,0 +1,27 @@
+meta:
+  name: "Двойной барьер (KO/KI)"
+  asset_class: fx
+  group: "Валютные"
+  description: "Коридор с отключением/включением при касании любой границы (Ikeda-Kunitomo + VV)."
+  params:
+    trade_id: {type: str, default: "DBL-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    option: {type: str, default: "call", choices: [call, put]}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 84.0}
+    lower: {type: float, default: 76.0}
+    upper: {type: float, default: 100.0}
+    kind: {type: str, default: "out", choices: ["in", "out"]}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Двойной барьер {{ kind }} {{ pair }}"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: option
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: "{{ option }}", strike: {{ strike }}, modifiers: [{type: barrier, kind: "{{ kind }}", lower: {{ lower }}, upper: {{ upper }}}]}

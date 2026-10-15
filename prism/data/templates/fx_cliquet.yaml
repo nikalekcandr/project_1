@@ -1,0 +1,24 @@
+meta:
+  name: "Cliquet / ratchet"
+  asset_class: fx
+  group: "Валютные"
+  description: "Страйк переустанавливается на начало каждого периода (forward start — нужна форвардная волатильность); локальные кэпы."
+  params:
+    trade_id: {type: str, default: "CLQ-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    local_cap: {type: float, default: 3.0, label: "Локальный кэп, руб."}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Cliquet {{ pair }} (ежемесячный ресет страйка)"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: cliquet
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: call, strike: 0.0, modifiers: [{type: strike_reset, base: spot, pct: 1.0}, {type: cap_floor, local_cap: {{ local_cap }}, unit: amount}]}

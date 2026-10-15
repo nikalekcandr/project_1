@@ -1,0 +1,29 @@
+meta:
+  name: "Кросс-валютный своп RUB/CNY"
+  asset_class: rate
+  group: "Процентные"
+  description: "Обмен номиналами, фиксированный юань против ключевой ставки в рублях; мультивалютное дисконтирование с базисом (через форвардные пункты)."
+  params:
+    trade_id: {type: str, default: "CCS-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    cny_notional: {type: float, default: 100000000}
+    cny_rate: {type: float, default: 0.035}
+    start: {type: date, default: "2026-10-19"}
+    years: {type: int, default: 3}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "CCS: клиент платит CNY {{ cny_rate }}, получает КС в RUB"
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  legs:
+    - name: cny_fixed
+      currency: CNY
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 6M, calendar: "RU+CN", daycount: ACT/360}
+      notional: {currency: CNY, amount: {{ cny_notional }}}
+      exchange_notional: both
+      components: [{kind: fixed, rate: {{ cny_rate }}, position: short}]
+    - name: rub_float
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 6M, calendar: RU}
+      notional: {currency: RUB, amount: {{ (cny_notional * 11.52)|round(0) }}}
+      exchange_notional: both
+      components: [{kind: float, position: long}]

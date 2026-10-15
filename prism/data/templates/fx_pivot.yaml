@@ -1,0 +1,27 @@
+meta:
+  name: "Pivot / range forward"
+  asset_class: fx
+  group: "Валютные"
+  description: "Курс покупки зависит от диапазона: внутри коридора — рынок, за границами — фиксированные курсы."
+  params:
+    trade_id: {type: str, default: "PIV-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    low: {type: float, default: 84.0}
+    high: {type: float, default: 94.0}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Range forward {{ pair }} {{ low }}–{{ high }}"
+  purpose: {type: buy_fx}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: strip
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: call, strike: {{ high }}, position: long}
+        - {kind: put, strike: {{ low }}, position: short}

@@ -1,0 +1,25 @@
+meta:
+  name: "Quanto против composite: золото с расчётом в рублях"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Quanto фиксирует курс пересчёта, composite — нет: это разные цены, подмена одного другим — частая ошибка."
+  params:
+    trade_id: {type: str, default: "QNT-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    type: {type: str, default: "quanto", choices: [quanto, composite]}
+    ounces: {type: float, default: 10000}
+    strike: {type: float, default: 3700}
+    fx_rate: {type: float, default: 82.5}
+    expiry: {type: date, default: "2027-06-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ type|capitalize }}-колл на золото {{ strike }} USD, расчёт в RUB"
+  underlyings: {G: {asset_class: commodity, id: GOLD}}
+  legs:
+    - name: option
+      underlying: G
+      currency: USD
+      schedule: {dates: ["{{ expiry|d }}"], calendar: WEEKENDS}
+      notional: {currency: USD, amount: {{ ounces }}}
+      settlement: {type: cash, currency: RUB, quanto: {type: "{{ type }}", pair: USDRUB, rate: {{ fx_rate if type == 'quanto' else 'null' }}, fixing_source: CBR}}
+      components: [{kind: call, strike: {{ strike }}}]

@@ -1,0 +1,32 @@
+meta:
+  name: "Кредитная нота (CLN)"
+  asset_class: credit
+  group: "Кредитные"
+  description: "Купоны и погашение при выживании референсного эмитента, восстановление при дефолте."
+  params:
+    trade_id: {type: str, default: "CLN-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    reference: {type: str, default: "CLIENT_AGRO"}
+    notional: {type: float, default: 100000000}
+    coupon: {type: float, default: 0.21}
+    years: {type: int, default: 2}
+    price: {type: float, default: 100000000}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "CLN на {{ reference }}, купон {{ coupon }}"
+  purpose: {type: investment}
+  premium: {amount: {{ price }}, currency: RUB, payer: client}
+  underlyings: {C: {asset_class: credit, id: "{{ reference }}"}}
+  legs:
+    - name: coupons
+      observable: {type: credit, entity: "{{ reference }}"}
+      currency: RUB
+      schedule: {start: "2026-10-16", end: "{{ add_months(date(2026,10,16), 12*years)|d }}", frequency: 6M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: fixed, rate: {{ coupon }}}, {kind: recovery}]
+    - name: redemption
+      observable: {type: credit, entity: "{{ reference }}"}
+      currency: RUB
+      schedule: {start: "2026-10-16", dates: ["{{ add_months(date(2026,10,16), 12*years)|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: redemption, payout: 1.0}]

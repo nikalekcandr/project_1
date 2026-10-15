@@ -1,0 +1,24 @@
+meta:
+  name: "Опцион на акцию / индекс"
+  asset_class: equity
+  group: "Долевые"
+  description: "Дискретные дивиденды моделируются явно; ставка заимствования бумаги — отдельный вход."
+  params:
+    trade_id: {type: str, default: "EQO-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    asset: {type: str, default: "SBER", choices: [SBER, IMOEX, GAZP]}
+    option: {type: str, default: "call", choices: [call, put]}
+    shares: {type: float, default: 1000000}
+    strike: {type: float, default: 320.0}
+    expiry: {type: date, default: "2027-09-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ option|capitalize }} на {{ asset }} {{ strike }}"
+  underlyings: {S: {asset_class: equity, id: "{{ asset }}", fixing: {source: MOEX}}}
+  legs:
+    - name: option
+      underlying: S
+      currency: RUB
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU, payment_lag: 1}
+      notional: {currency: RUB, amount: {{ shares }}}
+      components: [{kind: "{{ option }}", strike: {{ strike }}}]

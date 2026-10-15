@@ -1,0 +1,30 @@
+meta:
+  name: "Амортизируемый своп (под график кредита)"
+  asset_class: rate
+  group: "Процентные"
+  description: "Номинал меняется по датам — amortizing / accreting / roller-coaster подгоняется под график кредита."
+  params:
+    trade_id: {type: str, default: "IRSA-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1200000000}
+    fixed_rate: {type: float, default: 0.138}
+    start: {type: date, default: "2026-10-16"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Амортизируемый IRS на КС"
+  purpose: {type: pay_floating}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  legs:
+  {% for nm, pos, comp in [("fixed", "short", "{kind: fixed, rate: " ~ fixed_rate ~ ", position: short}"), ("float", "long", "{kind: float, position: long}")] %}
+    - name: {{ nm }}
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 36)|d }}", frequency: 3M, calendar: RU}
+      notional:
+        currency: RUB
+        amount: {{ notional }}
+        schedule:
+  {% for k in range(1, 12) %}
+          - {date: "{{ add_months(start, 3*k)|d }}", amount: {{ notional * (12 - k) / 12 }}}
+  {% endfor %}
+      components: [{{ comp }}]
+  {% endfor %}

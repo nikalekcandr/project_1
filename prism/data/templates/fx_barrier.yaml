@@ -1,0 +1,32 @@
+meta:
+  name: "Барьерный валютный опцион (одиночный барьер)"
+  asset_class: fx
+  group: "Валютные"
+  description: "UI/UO/DI/DO реализуются единообразно; режим наблюдения — параметр. Аналитика Райнера-Рубинштейна + vanna-volga, проверка LV-PDE."
+  params:
+    trade_id: {type: str, default: "BAR-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    option: {type: str, default: "call", choices: [call, put]}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 86.0}
+    barrier: {type: float, default: 98.0}
+    direction: {type: str, default: "up", choices: [up, down]}
+    kind: {type: str, default: "out", choices: ["in", "out"]}
+    monitoring: {type: str, default: "continuous", choices: [continuous, discrete, terminal]}
+    rebate: {type: float, default: 0.0}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ option }} {{ direction }}-and-{{ kind }} {{ pair }}"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: option
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - kind: "{{ option }}"
+          strike: {{ strike }}
+          modifiers:
+            - {type: barrier, kind: "{{ kind }}", direction: "{{ direction }}", level: {{ barrier }}, monitoring: "{{ monitoring }}", observation: daily, rebate: {amount: {{ rebate }}, timing: at_hit}}

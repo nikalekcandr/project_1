@@ -1,0 +1,40 @@
+meta:
+  name: "Свопцион (европейский / бермудский)"
+  asset_class: rate
+  group: "Процентные"
+  description: "Право войти в своп. Европейский — Башелье на своп-ставку; бермудский — обратная индукция в дереве Hull-White (не набор европейских)."
+  params:
+    trade_id: {type: str, default: "SWO-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    style: {type: str, default: "bermudan", choices: [european, bermudan]}
+    side: {type: str, default: "payer", choices: [payer, receiver]}
+    notional: {type: float, default: 1000000000}
+    strike: {type: float, default: 0.135}
+    start: {type: date, default: "2027-10-18"}
+    years: {type: int, default: 4}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ 'Бермудский' if style == 'bermudan' else 'Европейский' }} {{ side }}-свопцион {{ start }} на {{ years }}Y, страйк {{ strike }}"
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  modifiers:
+    - type: exercise
+      holder: client
+      dates:
+  {% if style == 'european' %}
+        - "{{ start|d }}"
+  {% else %}
+  {% for k in range(years) %}
+        - "{{ add_months(start, 12*k)|d }}"
+  {% endfor %}
+  {% endif %}
+  legs:
+    - name: fixed
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 1Y, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: fixed, rate: {{ strike }}, position: "{{ 'short' if side == 'payer' else 'long' }}"}]
+    - name: float
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 1Y, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: float, position: "{{ 'long' if side == 'payer' else 'short' }}"}]

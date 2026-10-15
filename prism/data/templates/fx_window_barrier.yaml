@@ -1,0 +1,28 @@
+meta:
+  name: "Оконный барьер"
+  asset_class: fx
+  group: "Валютные"
+  description: "Барьер активен только в заданном окне — аналитики нет, Монте-Карло с мостом Брауна."
+  params:
+    trade_id: {type: str, default: "WIN-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 86.0}
+    barrier: {type: float, default: 97.0}
+    window_start: {type: date, default: "2027-01-15"}
+    window_end: {type: date, default: "2027-03-15"}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Колл с оконным KO-барьером {{ pair }}"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: option
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - kind: call
+          strike: {{ strike }}
+          modifiers: [{type: barrier, kind: out, direction: up, level: {{ barrier }}, window_start: "{{ window_start|d }}", window_end: "{{ window_end|d }}"}]

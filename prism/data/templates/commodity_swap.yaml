@@ -1,0 +1,28 @@
+meta:
+  name: "Товарный своп fixed-float на средний Brent (расчёт в рублях)"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Среднее за календарный месяц, объём в баррелях, цена в USD, расчёт в рублях по курсу ЦБ (composite)."
+  params:
+    trade_id: {type: str, default: "CMS-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    asset: {type: str, default: "BRENT", choices: [BRENT, URALS, GOLD]}
+    volume: {type: float, default: 100000, label: "Объём в месяц, баррелей"}
+    fixed_price: {type: float, default: 67.0}
+    start: {type: date, default: "2027-01-01"}
+    months: {type: int, default: 6}
+    side: {type: str, default: "sell", choices: [buy, sell], label: "Клиент фиксирует продажу (sell) / покупку (buy)"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Своп на средний {{ asset }} {{ fixed_price }} USD, расчёт в RUB"
+  purpose: {type: "{{ 'sell_commodity' if side == 'sell' else 'buy_commodity' }}"}
+  underlyings: {B: {asset_class: commodity, id: "{{ asset }}", unit: bbl, fixing: {source: PLATTS}}}
+  legs:
+    - name: swap
+      underlying: B
+      currency: USD
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: WEEKENDS, observation: daily, payment_lag: 5}
+      notional: {currency: USD, amount: {{ volume }}}
+      modifiers: [{type: averaging, method: arithmetic}]
+      settlement: {type: cash, currency: RUB, quanto: {type: composite, pair: USDRUB, fixing_source: CBR}}
+      components: [{kind: forward, strike: {{ fixed_price }}, position: "{{ 'short' if side == 'sell' else 'long' }}"}]

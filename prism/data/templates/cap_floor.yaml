@@ -1,0 +1,26 @@
+meta:
+  name: "Кэп / флор на ключевую ставку"
+  asset_class: rate
+  group: "Процентные"
+  description: "Ряд каплетов (флорлетов); Башелье покаплетно по нормальной волатильности."
+  params:
+    trade_id: {type: str, default: "CAP-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    type: {type: str, default: "cap", choices: [cap, floor]}
+    notional: {type: float, default: 1000000000}
+    strike: {type: float, default: 0.15}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 3}
+    premium: {type: float, default: 10000000, label: "Премия банку, руб."}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ 'Кэп' if type == 'cap' else 'Флор' }} на КС {{ strike }} {{ years }}Y"
+  purpose: {type: "{{ 'pay_floating' if type == 'cap' else 'receive_floating' }}"}
+  premium: {amount: {{ premium }}, currency: RUB, payer: client}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  legs:
+    - name: caplets
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: "{{ type }}", strike: {{ strike }}}]

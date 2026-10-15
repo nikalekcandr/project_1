@@ -1,0 +1,31 @@
+meta:
+  name: "Нота с защитой капитала"
+  asset_class: equity
+  group: "Структурные"
+  description: "Облигационная часть + колл-спред на индекс: уровень защиты, участие, кэп. Разложение на безрисковую часть и опцион."
+  params:
+    trade_id: {type: str, default: "CPN-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    asset: {type: str, default: "IMOEX"}
+    notional: {type: float, default: 100000000}
+    protection: {type: float, default: 1.0}
+    participation: {type: float, default: 0.7}
+    cap: {type: float, default: 1.35}
+    maturity: {type: date, default: "2028-10-16"}
+    price: {type: float, default: 100000000, label: "Цена размещения, руб."}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Нота: защита {{ (protection*100)|int }}%, участие {{ (participation*100)|int }}% в {{ asset }} до {{ (cap*100)|int }}%"
+  purpose: {type: investment}
+  premium: {amount: {{ price }}, currency: RUB, payer: client}
+  underlyings: {S: {asset_class: equity, id: "{{ asset }}"}}
+  legs:
+    - name: note
+      underlying: S
+      observable: {type: performance, name: S}
+      currency: RUB
+      schedule: {dates: ["{{ maturity|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components:
+        - {kind: redemption, payout: {{ protection }}, label: "облигационная часть"}
+        - {kind: call, strike: 1.0, gearing: {{ participation }}, cap_strike: {{ cap }}, label: "колл-спред"}

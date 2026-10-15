@@ -1,0 +1,25 @@
+meta:
+  name: "Валютный форвард (поставочный)"
+  asset_class: fx
+  group: "Валютные"
+  description: "Покупка (продажа) валюты по фиксированному курсу на дату валютирования. Волатильность не нужна; базис к onshore-ставке диагностичен."
+  params:
+    trade_id: {type: str, default: "FWD-001", label: "ID сделки"}
+    client: {type: str, default: "CLIENT_IMPORT", label: "Клиент"}
+    pair: {type: str, default: "USDRUB", label: "Валютная пара"}
+    side: {type: str, default: "buy", label: "Клиент покупает (buy) / продаёт (sell) базовую валюту", choices: [buy, sell]}
+    notional: {type: float, default: 1000000, label: "Номинал, базовая валюта"}
+    strike: {type: float, default: 88.5, label: "Форвардный курс"}
+    value_date: {type: date, default: "2027-04-15", label: "Дата валютирования"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Валютный форвард {{ pair }}"
+  purpose: {type: "{{ 'buy_fx' if side == 'buy' else 'sell_fx' }}"}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: MOEX}}}
+  settlement: {type: physical, currency: RUB}
+  legs:
+    - name: forward
+      underlying: X
+      schedule: {dates: ["{{ value_date|d }}"], calendar: "RU+{{ pair[:3] }}"}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components: [{kind: forward, strike: {{ strike }}, position: "{{ 'long' if side == 'buy' else 'short' }}"}]

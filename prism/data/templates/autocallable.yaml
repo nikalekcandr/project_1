@@ -1,0 +1,40 @@
+meta:
+  name: "Autocallable / snowball на worst-of"
+  asset_class: equity
+  group: "Долевые"
+  description: "Купон с памятью, барьер купона, автоколл, барьер защиты капитала (knock-in пут). Массовый продукт со сложной путезависимостью; чувствительность к корреляции."
+  params:
+    trade_id: {type: str, default: "AC-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 100000000}
+    coupon: {type: float, default: 0.045, label: "Купон за квартал"}
+    coupon_barrier: {type: float, default: 0.80}
+    autocall: {type: float, default: 1.00}
+    protection: {type: float, default: 0.65}
+    start: {type: date, default: "2026-10-15"}
+    quarters: {type: int, default: 8}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Autocallable worst-of SBER/IMOEX, купон {{ coupon }} с памятью"
+  purpose: {type: investment}
+  underlyings:
+    A: {asset_class: equity, id: SBER}
+    B: {asset_class: equity, id: IMOEX}
+  modifiers: [{type: autocall, level: {{ autocall }}, redemption: 1.0, leg: coupons}]
+  model: {paths: 20000}
+  legs:
+    - name: coupons
+      observable: {type: basket, names: [A, B], rule: worst_of, performance: true}
+      currency: RUB
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 3*quarters)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components:
+        - {kind: digital_call, strike: {{ coupon_barrier }}, payout: {{ coupon }}, modifiers: [{type: memory}]}
+    - name: redemption
+      observable: {type: basket, names: [A, B], rule: worst_of, performance: true}
+      currency: RUB
+      schedule: {start: "{{ start|d }}", dates: ["{{ add_months(start, 3*quarters)|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components:
+        - {kind: redemption, payout: 1.0}
+        - {kind: put, strike: 1.0, position: short, modifiers: [{type: barrier, kind: in, direction: down, level: {{ protection }}, monitoring: discrete, observation: daily}]}

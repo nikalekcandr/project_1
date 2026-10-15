@@ -1,0 +1,24 @@
+meta:
+  name: "Цифровой (бинарный) опцион"
+  asset_class: fx
+  group: "Валютные"
+  description: "Фиксированная выплата при курсе выше/ниже страйка. Разрыв выплаты: цена с поправкой на наклон улыбки."
+  params:
+    trade_id: {type: str, default: "DIG-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    direction: {type: str, default: "call", choices: [call, put]}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 92.0}
+    payout: {type: float, default: 5.0, label: "Выплата, руб. на единицу номинала"}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Цифровой {{ direction }} {{ pair }}"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: digital
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components: [{kind: "digital_{{ direction }}", strike: {{ strike }}, payout: {{ payout }}}]

@@ -1,0 +1,33 @@
+meta:
+  name: "Барьерный (отключаемый) кэп"
+  asset_class: rate
+  group: "Процентные"
+  description: "Главный носитель наценки: кэп отключается, если ставка превысит барьер. Закрытой формы нет — Монте-Карло Hull-White."
+  params:
+    trade_id: {type: str, default: "BCAP-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    strike: {type: float, default: 0.15}
+    barrier: {type: float, default: 0.19}
+    scope: {type: str, default: "trade", choices: [trade, period], label: "Отключение: навсегда (trade) или на период (period)"}
+    monitoring: {type: str, default: "discrete", choices: [discrete, terminal]}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 3}
+    premium: {type: float, default: 11000000, label: "Премия банку, руб."}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Барьерный кэп КС {{ strike }}, отключение выше {{ barrier }}"
+  purpose: {type: pay_floating}
+  premium: {amount: {{ premium }}, currency: RUB, payer: client}
+  underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+  model: {paths: 20000}
+  legs:
+    - name: caplets
+      underlying: KS
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components:
+        - kind: cap
+          strike: {{ strike }}
+          modifiers: [{type: barrier, kind: out, direction: up, level: {{ barrier }}, monitoring: "{{ monitoring }}", observation: fixings, scope: "{{ scope }}",
+                       observable: {type: rate, index: KEYRATE, compounding: simple_average}}]

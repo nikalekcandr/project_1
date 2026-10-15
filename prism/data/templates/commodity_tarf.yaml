@@ -1,0 +1,29 @@
+meta:
+  name: "TARF на товар"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Целевое погашение на товарном базисе — тот же модификатор, что и для валют."
+  params:
+    trade_id: {type: str, default: "CTARF-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    asset: {type: str, default: "BRENT"}
+    volume: {type: float, default: 50000}
+    strike: {type: float, default: 70.0}
+    target: {type: float, default: 15.0}
+    start: {type: date, default: "2027-01-01"}
+    months: {type: int, default: 12}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "TARF на {{ asset }} (продажа по {{ strike }}), цель {{ target }} USD"
+  purpose: {type: sell_commodity}
+  underlyings: {B: {asset_class: commodity, id: "{{ asset }}"}}
+  modifiers: [{type: target, level: {{ target }}, last_payment: partial}]
+  legs:
+    - name: strip
+      underlying: B
+      currency: USD
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: WEEKENDS, payment_lag: 5}
+      notional: {currency: USD, amount: {{ volume }}}
+      components:
+        - {kind: put, strike: {{ strike }}, position: long}
+        - {kind: call, strike: {{ strike }}, position: short, notional_multiplier: 2.0}

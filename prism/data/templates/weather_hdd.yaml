@@ -1,0 +1,23 @@
+meta:
+  name: "Погодный дериватив на HDD"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Колл на сумму градусо-дней отопительного сезона. Торгуемого хеджа нет — оценка актуарная, в исторической мере, и отчёт это помечает."
+  params:
+    trade_id: {type: str, default: "HDD-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    strike: {type: float, default: 4000}
+    tick: {type: float, default: 20000, label: "Руб. за градусо-день"}
+    cap: {type: float, default: 20000000, label: "Максимальная выплата, руб."}
+    payment: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "HDD-колл, станция 27612, страйк {{ strike }}"
+  underlyings: {W: {asset_class: commodity, id: WEATHER_HDD_27612, tradeable_hedge: false}}
+  legs:
+    - name: hdd
+      observable: {type: weather, dataset: weather_hdd_27612}
+      currency: RUB
+      schedule: {dates: ["{{ payment|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: 1.0}
+      components: [{kind: call, strike: {{ strike }}, gearing: {{ tick }}, cap_strike: {{ cap }}}]

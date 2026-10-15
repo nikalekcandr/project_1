@@ -1,0 +1,25 @@
+meta:
+  name: "Расчётный форвард (NDF) на курс ЦБ"
+  asset_class: fx
+  group: "Валютные"
+  description: "Расчёт разницы в рублях по официальному курсу ЦБ на дату фиксинга. Курс ЦБ устанавливается накануне — лаг учитывается."
+  params:
+    trade_id: {type: str, default: "NDF-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 88.0}
+    fixing_date: {type: date, default: "2027-04-14"}
+    fixing_source: {type: str, default: "CBR", choices: [CBR, MOEX]}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "NDF {{ pair }} на курс {{ fixing_source }}"
+  purpose: {type: buy_fx}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: "{{ fixing_source }}", lag_days: {{ -1 if fixing_source == 'CBR' else 0 }}}}}
+  settlement: {type: cash, currency: RUB, fixing_source: "{{ fixing_source }}"}
+  legs:
+    - name: ndf
+      underlying: X
+      schedule: {dates: ["{{ fixing_date|d }}"], calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components: [{kind: forward, strike: {{ strike }}}]

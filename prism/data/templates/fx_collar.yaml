@@ -1,0 +1,27 @@
+meta:
+  name: "Коллар (обычно нулевой стоимости)"
+  asset_class: fx
+  group: "Валютные"
+  description: "Купленный колл + проданный пут на одинаковый номинал: базовая ванильная альтернатива для корпоратов."
+  params:
+    trade_id: {type: str, default: "COL-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000, label: "Номинал на фиксинг"}
+    cap: {type: float, default: 92.0}
+    floor: {type: float, default: 84.0}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Коллар {{ pair }} {{ floor }}–{{ cap }}"
+  purpose: {type: buy_fx}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  legs:
+    - name: strip
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: call, strike: {{ cap }}, position: long}
+        - {kind: put, strike: {{ floor }}, position: short}

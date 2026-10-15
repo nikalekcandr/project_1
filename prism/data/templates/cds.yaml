@@ -1,0 +1,30 @@
+meta:
+  name: "CDS на эмитента"
+  asset_class: credit
+  group: "Кредитные"
+  description: "Ликвидного рынка нет — интенсивность из прокси-кривой (общий модуль с CVA)."
+  params:
+    trade_id: {type: str, default: "CDS-001"}
+    client: {type: str, default: "BANK_OTHER"}
+    reference: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 1000000000}
+    spread: {type: float, default: 0.03}
+    start: {type: date, default: "2026-10-20"}
+    years: {type: int, default: 3}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "CDS на {{ reference }} {{ years }}Y, спред {{ (spread*1e4)|int }} б.п."
+  underlyings: {C: {asset_class: credit, id: "{{ reference }}"}}
+  legs:
+    - name: premium
+      observable: {type: credit, entity: "{{ reference }}"}
+      currency: RUB
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: premium, rate: {{ spread }}, position: short}]
+    - name: protection
+      observable: {type: credit, entity: "{{ reference }}"}
+      currency: RUB
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: 3M, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: protection, position: long}]

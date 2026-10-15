@@ -1,0 +1,22 @@
+meta:
+  name: "Спред-опцион на кросс (USD/RUB − EUR/RUB)"
+  asset_class: fx
+  group: "Валютные"
+  description: "Опцион на разницу двух курсов: Блэк неприменим (спред бывает отрицательным) — Кирк / Монте-Карло."
+  params:
+    trade_id: {type: str, default: "SPR-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: -12.0}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Спред-колл USDRUB − EURRUB, страйк {{ strike }}"
+  underlyings: {U: {asset_class: fx, id: USDRUB}, E: {asset_class: fx, id: EURRUB}}
+  legs:
+    - name: spread
+      observable: {type: spread, terms: [{name: U, coef: 1.0}, {name: E, coef: -1.0}]}
+      currency: RUB
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: USD, amount: {{ notional }}}
+      components: [{kind: call, strike: {{ strike }}}]

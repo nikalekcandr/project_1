@@ -1,0 +1,29 @@
+meta:
+  name: "Инфляционный своп нулевого купона (ZCIS)"
+  asset_class: inflation
+  group: "Инфляционные"
+  description: "Индексация на ИПЦ Росстата с лагом (3 мес. типично, задаётся явно), сезонность моделируется, версия публикации — по контракту."
+  params:
+    trade_id: {type: str, default: "ZCIS-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    notional: {type: float, default: 1000000000}
+    fixed_rate: {type: float, default: 0.05}
+    start: {type: date, default: "2026-10-16"}
+    years: {type: int, default: 5}
+    lag: {type: int, default: 3}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "ZCIS на ИПЦ {{ years }}Y, фикс. {{ fixed_rate }}"
+  underlyings: {CPI: {asset_class: inflation, id: RU.CPI}}
+  legs:
+    - name: inflation
+      underlying: CPI
+      observable: {type: cpi, name: RU.CPI, lag_months: {{ lag }}, version: revised, measure: ratio_to_base}
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: once, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: index_ratio, position: long}]
+    - name: fixed
+      underlying: CPI
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, 12*years)|d }}", frequency: once, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: fixed_compounded, rate: {{ fixed_rate }}, position: short}]

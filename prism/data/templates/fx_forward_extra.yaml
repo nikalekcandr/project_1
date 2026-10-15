@@ -1,0 +1,33 @@
+meta:
+  name: "Forward extra / forward plus"
+  asset_class: fx
+  group: "Валютные"
+  description: "Экзотика под видом форварда: худший курс защищён, выгода от падения курса — до барьера; при касании барьера — обязательная покупка по страйку."
+  params:
+    trade_id: {type: str, default: "FX-EXTRA-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000, label: "Номинал на фиксинг"}
+    strike: {type: float, default: 88.1, label: "Курс защиты"}
+    barrier: {type: float, default: 78.0, label: "Барьер (knock-in вниз)"}
+    monitoring: {type: str, default: "continuous", choices: [continuous, discrete]}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15",
+                   termsheet: "TS-EXTRA-2026-10", master_agreement: {type: RU_NFA, registered_in_repository: true}}
+  product: "Forward extra {{ pair }}: защита {{ strike }}, барьер {{ barrier }}"
+  purpose: {type: buy_fx, exposure_notional: {{ notional * months }}, description: "импортная выручка в USD ежемесячно"}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  legs:
+    - name: strip
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {value: {{ notional }}, ref: "п. 2.1 термшита"}}
+      components:
+        - {kind: call, strike: {value: {{ strike }}, ref: "п. 3.1 «Курс защиты»"}, position: long, label: "защита"}
+        - kind: put
+          strike: {{ strike }}
+          position: short
+          label: "обязательство при касании барьера"
+          modifiers: [{type: barrier, kind: in, direction: down, level: {value: {{ barrier }}, ref: "п. 3.2 «Барьер»"}, monitoring: "{{ monitoring }}", observation: daily}]

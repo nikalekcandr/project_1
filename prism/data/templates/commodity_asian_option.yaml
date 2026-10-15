@@ -1,0 +1,26 @@
+meta:
+  name: "Азиатский товарный опцион (среднее за месяц)"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Рыночный стандарт — азиатский, а не европейский; усреднение по календарному месяцу с сезонной кривой."
+  params:
+    trade_id: {type: str, default: "CAO-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    asset: {type: str, default: "BRENT"}
+    option: {type: str, default: "put", choices: [call, put]}
+    volume: {type: float, default: 100000}
+    strike: {type: float, default: 64.0}
+    month: {type: date, default: "2027-03-01"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Азиатский {{ option }} {{ asset }} {{ strike }} USD ({{ month.strftime('%Y-%m') }})"
+  purpose: {type: "{{ 'sell_commodity' if option == 'put' else 'buy_commodity' }}"}
+  underlyings: {B: {asset_class: commodity, id: "{{ asset }}"}}
+  legs:
+    - name: asian
+      underlying: B
+      currency: USD
+      schedule: {start: "{{ month|d }}", end: "{{ add_months(month, 1)|d }}", frequency: 1M, calendar: WEEKENDS, observation: daily, payment_lag: 5}
+      notional: {currency: USD, amount: {{ volume }}}
+      modifiers: [{type: averaging, method: arithmetic}]
+      components: [{kind: "{{ option }}", strike: {{ strike }}}]

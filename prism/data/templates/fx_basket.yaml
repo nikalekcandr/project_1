@@ -1,0 +1,29 @@
+meta:
+  name: "Корзинный валютный опцион"
+  asset_class: fx
+  group: "Валютные"
+  description: "Опцион на корзину валют против рубля; требует корреляционной матрицы (контроль положительной определённости)."
+  params:
+    trade_id: {type: str, default: "BSK-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    notional: {type: float, default: 100000000, label: "Номинал, руб."}
+    strike: {type: float, default: 1.05, label: "Страйк, доля начального уровня корзины"}
+    w_usd: {type: float, default: 0.4}
+    w_cny: {type: float, default: 0.4}
+    w_eur: {type: float, default: 0.2}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Колл на валютную корзину USD/CNY/EUR против рубля"
+  purpose: {type: buy_fx}
+  underlyings:
+    U: {asset_class: fx, id: USDRUB}
+    C: {asset_class: fx, id: CNYRUB}
+    E: {asset_class: fx, id: EURRUB}
+  legs:
+    - name: basket
+      observable: {type: basket, names: [U, C, E], weights: [{{ w_usd }}, {{ w_cny }}, {{ w_eur }}], rule: sum, performance: true}
+      currency: RUB
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: call, strike: {{ strike }}}]

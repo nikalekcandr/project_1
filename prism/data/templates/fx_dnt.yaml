@@ -1,0 +1,26 @@
+meta:
+  name: "Double-no-touch"
+  asset_class: fx
+  group: "Валютные"
+  description: "Продаётся как «доход», по сути — продажа волатильности: выплата, если курс не выйдет из коридора."
+  params:
+    trade_id: {type: str, default: "DNT-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    pair: {type: str, default: "USDRUB"}
+    lower: {type: float, default: 76.0}
+    upper: {type: float, default: 96.0}
+    payout: {type: float, default: 10000000}
+    expiry: {type: date, default: "2027-04-15"}
+    premium: {type: float, default: 3500000}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Double-no-touch {{ pair }} {{ lower }}–{{ upper }}"
+  purpose: {type: investment, description: "доходный продукт"}
+  premium: {amount: {{ premium }}, currency: RUB, payer: client}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: dnt
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ payout }}}
+      components: [{kind: cash, payout: 1.0, modifiers: [{type: barrier, kind: out, lower: {{ lower }}, upper: {{ upper }}}]}]

@@ -1,0 +1,36 @@
+meta:
+  name: "Accumulator (decumulator)"
+  asset_class: fx
+  group: "Валютные"
+  description: "Ежедневное накопление по курсу ниже рынка, удвоенный объём ниже страйка, отключение при росте курса выше KO. Сильная путезависимость."
+  params:
+    trade_id: {type: str, default: "ACC-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "CNYRUB"}
+    side: {type: str, default: "buy", choices: [buy, sell], label: "accumulator (buy) / decumulator (sell)"}
+    daily_notional: {type: float, default: 1000000}
+    strike: {type: float, default: 11.45}
+    ko: {type: float, default: 12.10}
+    leverage: {type: float, default: 2.0}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ 'Accumulator' if side == 'buy' else 'Decumulator' }} {{ pair }} {{ strike }}, KO {{ ko }}"
+  purpose: {type: "{{ 'buy_fx' if side == 'buy' else 'sell_fx' }}"}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: MOEX, calendar: RU}}}
+  modifiers: [{type: barrier, kind: out, direction: "{{ 'up' if side == 'buy' else 'down' }}", level: {{ ko }}, monitoring: discrete, observation: daily}]
+  model: {paths: 20000}
+  legs:
+    - name: daily
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: daily, calendar: "RU+CN"}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ daily_notional }}}
+      components:
+  {% if side == 'buy' %}
+        - {kind: call, strike: {{ strike }}, position: long}
+        - {kind: put, strike: {{ strike }}, position: short, notional_multiplier: {{ leverage }}}
+  {% else %}
+        - {kind: put, strike: {{ strike }}, position: long}
+        - {kind: call, strike: {{ strike }}, position: short, notional_multiplier: {{ leverage }}}
+  {% endif %}

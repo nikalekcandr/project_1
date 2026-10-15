@@ -1,0 +1,28 @@
+meta:
+  name: "One-touch / no-touch"
+  asset_class: fx
+  group: "Валютные"
+  description: "Выплата при касании (one-touch) или при отсутствии касания (no-touch); момент выплаты — при касании или в конце."
+  params:
+    trade_id: {type: str, default: "OT-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    type: {type: str, default: "one_touch", choices: [one_touch, no_touch]}
+    barrier: {type: float, default: 95.0}
+    direction: {type: str, default: "up", choices: [up, down]}
+    payout: {type: float, default: 10000000, label: "Выплата, руб."}
+    timing: {type: str, default: "at_expiry", choices: [at_hit, at_expiry]}
+    expiry: {type: date, default: "2027-04-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "{{ 'One-touch' if type == 'one_touch' else 'No-touch' }} {{ pair }} {{ barrier }}"
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}"}}
+  legs:
+    - name: touch
+      underlying: X
+      schedule: {dates: ["{{ expiry|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ payout }}}
+      components:
+        - kind: cash
+          payout: 1.0
+          modifiers: [{type: barrier, kind: "{{ 'in' if type == 'one_touch' else 'out' }}", direction: "{{ direction }}", level: {{ barrier }}, rebate: {amount: 0.0, timing: "{{ timing }}"}}]

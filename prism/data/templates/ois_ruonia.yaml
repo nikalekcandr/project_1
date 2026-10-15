@@ -1,0 +1,30 @@
+meta:
+  name: "OIS на RUONIA"
+  asset_class: rate
+  group: "Процентные"
+  description: "Фиксированная ставка против сложного процента по RUONIA; метод компаундирования, лаг наблюдения и lockout — параметры."
+  params:
+    trade_id: {type: str, default: "OIS-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    notional: {type: float, default: 500000000}
+    fixed_rate: {type: float, default: 0.145}
+    start: {type: date, default: "2026-10-16"}
+    months: {type: int, default: 12}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "OIS RUONIA {{ months }}M"
+  purpose: {type: pay_floating}
+  underlyings: {R: {asset_class: rate, id: RUONIA}}
+  collateral: {regime: two_way, threshold_client: 0, threshold_bank: 0, mta: 1000000}
+  legs:
+    - name: fixed
+      underlying: R
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: once, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: fixed, rate: {{ fixed_rate }}, position: short}]
+    - name: float
+      underlying: R
+      observable: {type: rate, index: RUONIA, compounding: compounded, lookback_days: 0}
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: once, calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components: [{kind: float, position: long}]

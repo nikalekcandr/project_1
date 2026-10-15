@@ -1,0 +1,28 @@
+meta:
+  name: "Reverse convertible"
+  asset_class: equity
+  group: "Долевые"
+  description: "Высокий купон в обмен на проданный пут на акцию: погашение акциями при падении ниже страйка конвертации."
+  params:
+    trade_id: {type: str, default: "RC-001"}
+    client: {type: str, default: "CLIENT_METAL"}
+    asset: {type: str, default: "SBER"}
+    notional: {type: float, default: 100000000}
+    coupon: {type: float, default: 0.24}
+    strike: {type: float, default: 0.9, label: "Страйк конвертации, доля начальной цены"}
+    maturity: {type: date, default: "2027-10-15"}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Reverse convertible на {{ asset }}, купон {{ coupon }}"
+  purpose: {type: investment}
+  underlyings: {S: {asset_class: equity, id: "{{ asset }}"}}
+  legs:
+    - name: note
+      underlying: S
+      observable: {type: performance, name: S}
+      currency: RUB
+      schedule: {dates: ["{{ maturity|d }}"], calendar: RU}
+      notional: {currency: RUB, amount: {{ notional }}}
+      components:
+        - {kind: redemption, payout: {{ 1 + coupon }}}
+        - {kind: put, strike: {{ strike }}, position: short, gearing: {{ 1 / strike }}}

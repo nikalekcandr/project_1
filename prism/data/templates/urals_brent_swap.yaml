@@ -1,0 +1,23 @@
+meta:
+  name: "Своп на дифференциал Urals − Brent"
+  asset_class: commodity
+  group: "Товарные"
+  description: "Базовый хедж экспортёра: фиксация дисконта Urals к Brent."
+  params:
+    trade_id: {type: str, default: "DIFF-001"}
+    client: {type: str, default: "CLIENT_ENERGY"}
+    volume: {type: float, default: 200000}
+    fixed_diff: {type: float, default: -11.0}
+    start: {type: date, default: "2027-01-01"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Своп на дифференциал Urals−Brent {{ fixed_diff }}"
+  underlyings: {U: {asset_class: commodity, id: URALS}, B: {asset_class: commodity, id: BRENT}}
+  legs:
+    - name: diff
+      observable: {type: spread, terms: [{name: U, coef: 1.0}, {name: B, coef: -1.0}]}
+      currency: USD
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: WEEKENDS, payment_lag: 5}
+      notional: {currency: USD, amount: {{ volume }}}
+      components: [{kind: forward, strike: {{ fixed_diff }}, position: long}]

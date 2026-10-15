@@ -1,0 +1,129 @@
+# Конфигурация построения рыночных объектов из снапшота.
+# Всё, что здесь задано, — параметры, а не константы кода: дисконтная кривая
+# по режиму обеспечения, интерполяции, конвенции свопов и дельт, источники.
+version: 1
+
+discounting:
+  # RUSFAR — для сделок под обеспечением, кривая ключевой ставки — для
+  # необеспеченных сделок с корпоратами (типичный случай).
+  RUB: {collateralized: RUB.RUSFAR, uncollateralized: RUB.KEYRATE}
+  USD: {collateralized: USD.SOFR, uncollateralized: USD.SOFR}
+  EUR: {collateralized: EUR.ESTR, uncollateralized: EUR.ESTR}
+  CNY: {collateralized: CNY.REPO, uncollateralized: CNY.REPO}
+  CNH: {collateralized: CNH.HIBOR, uncollateralized: CNH.HIBOR}
+
+indices:
+  # Основной плавающий индикатор корпоративного кредитования в РФ — ключевая ставка.
+  KEYRATE:   {curve: RUB.KEYRATE, currency: RUB, compounding: simple_average, daycount: ACT/365F, kind: overnight}
+  RUONIA:    {curve: RUB.RUONIA,  currency: RUB, compounding: compounded,     daycount: ACT/365F, kind: overnight}
+  RUSFAR:    {curve: RUB.RUSFAR,  currency: RUB, compounding: compounded,     daycount: ACT/365F, kind: overnight}
+  RUSFAR3M:  {curve: RUB.RUSFAR,  currency: RUB, compounding: term,           daycount: ACT/365F, kind: term, tenor: 3M}
+  MOSPRIME3M:
+    curve: RUB.RUSFAR
+    currency: RUB
+    compounding: term
+    daycount: ACT/365F
+    kind: term
+    tenor: 3M
+    legacy: true
+    fallback_note: "MosPrime — унаследованный индикатор: проекция по RUSFAR 3M + спред-корректировка по правилам перехода (параметр сделки)"
+    spread_adjustment: 0.0035
+  SOFR:      {curve: USD.SOFR,  currency: USD, compounding: compounded, daycount: ACT/360, kind: overnight}
+  ESTR:      {curve: EUR.ESTR,  currency: EUR, compounding: compounded, daycount: ACT/360, kind: overnight}
+  SHIBOR3M:  {curve: CNY.REPO,  currency: CNY, compounding: term, daycount: ACT/360, kind: term, tenor: 3M}
+  CNHHIBOR3M: {curve: CNH.HIBOR, currency: CNH, compounding: term, daycount: ACT/360, kind: term, tenor: 3M}
+
+curves:
+  RUB.KEYRATE:
+    currency: RUB
+    calendar: RU
+    interpolation: monotone_convex
+    meeting_steps: true          # ступени на датах вступления в силу решений Совета директоров
+    step_horizon_months: 18
+    instruments:
+      - {type: deposit, quote: RATE.RUB.KEYRATE, tenor: "ON", start_lag: 0}
+      - {type: swap, prefix: SWAP.RUB.KEYRATE., start_lag: 1, fixed_freq: 3M, float_freq: 3M, compounding: simple_average}
+  RUB.RUSFAR:
+    currency: RUB
+    calendar: RU
+    interpolation: monotone_convex
+    meeting_steps: true
+    step_horizon_months: 18
+    instruments:
+      - {type: deposit, prefix: RATE.RUB.RUSFAR., start_lag: 0}
+      - {type: basis, prefix: BASIS.RUB.RUSFAR_KEYRATE., start_lag: 1, freq: 3M, other: RUB.KEYRATE, comp_a: compounded, comp_b: simple_average}
+  RUB.RUONIA:
+    currency: RUB
+    calendar: RU
+    interpolation: monotone_convex
+    meeting_steps: true
+    step_horizon_months: 18
+    instruments:
+      - {type: deposit, quote: RATE.RUB.RUONIA, tenor: "ON", start_lag: 0}
+      - {type: swap, prefix: RATE.RUB.ROISFIX., start_lag: 1, compounding: compounded}
+      - {type: basis, prefix: BASIS.RUB.RUONIA_KEYRATE., start_lag: 1, freq: 3M, other: RUB.KEYRATE, comp_a: compounded, comp_b: simple_average}
+  USD.SOFR:
+    currency: USD
+    calendar: US
+    interpolation: log_linear
+    instruments:
+      - {type: swap, prefix: RATE.USD.SOFR., start_lag: 2, fixed_freq: 1Y, float_freq: 1Y, daycount: ACT/360, compounding: compounded}
+  EUR.ESTR:
+    currency: EUR
+    calendar: TARGET
+    interpolation: log_linear
+    instruments:
+      - {type: swap, prefix: RATE.EUR.ESTR., start_lag: 2, fixed_freq: 1Y, float_freq: 1Y, daycount: ACT/360, compounding: compounded}
+  CNY.REPO:
+    currency: CNY
+    calendar: CN
+    interpolation: log_linear
+    instruments:
+      - {type: swap, prefix: RATE.CNY.REPO., start_lag: 1, fixed_freq: 3M, float_freq: 3M, daycount: ACT/365F, compounding: compounded}
+  CNH.HIBOR:
+    currency: CNH
+    calendar: HK
+    interpolation: log_linear
+    instruments:
+      - {type: swap, prefix: RATE.CNH.HIBOR., start_lag: 2, fixed_freq: 3M, float_freq: 3M, daycount: ACT/365F, compounding: compounded}
+
+fx:
+  # Рублёвые пары на Мосбирже — расчёты TOM (лаг 1 рабочий день).
+  USDRUB: {spot: FX.USDRUB.SPOT, points_prefix: FX.USDRUB.FWD., spot_lag: 1, calendar: RU+US, foreign_curve: USD.SOFR}
+  EURRUB: {spot: FX.EURRUB.SPOT, points_prefix: FX.EURRUB.FWD., spot_lag: 1, calendar: RU+TARGET, foreign_curve: EUR.ESTR}
+  # Для сделок внутри РФ — onshore CNY; CNH — отдельная offshore-кривая.
+  CNYRUB: {spot: FX.CNYRUB.SPOT, points_prefix: FX.CNYRUB.FWD., spot_lag: 1, calendar: RU+CN, foreign_curve: CNY.REPO}
+
+fx_vol:
+  USDRUB: {prefix: VOL.USDRUB., delta_type: spot, long_delta_type: forward, premium_adjusted: true, atm_type: dns, model: svi, sticky: delta}
+  CNYRUB: {prefix: VOL.CNYRUB., delta_type: spot, long_delta_type: forward, premium_adjusted: false, atm_type: dns, model: svi, sticky: delta}
+  EURRUB: {prefix: VOL.EURRUB., delta_type: spot, long_delta_type: forward, premium_adjusted: true, atm_type: dns, model: svi, sticky: delta}
+
+ir_vol:
+  RUB.KEYRATE:
+    quotes_prefix: VOL.RUB.KEYRATE.N.
+    historical_dataset: hist_rub_keyrate_swaps   # фоллбэк при отсутствии котировок — помечается
+    ewma_lambda: 0.97
+
+inflation:
+  RU.CPI: {dataset: cpi_ru, pillars_prefix: INFL.RUB.ZCIS., seasonality_years: 5, yoy_convexity_per_year: 0.0002}
+
+commodities:
+  BRENT: {prefix: CMDTY.BRENT.FUT., currency: USD, unit: bbl, vol_prefix: VOL.BRENT., tradeable_hedge: true}
+  URALS: {prefix: CMDTY.URALS.FUT., currency: USD, unit: bbl, vol_prefix: VOL.URALS., tradeable_hedge: true}
+  GOLD:  {prefix: CMDTY.GOLD.FUT., currency: USD, unit: troy_oz, vol_prefix: VOL.GOLD., tradeable_hedge: true}
+  WHEAT_RU: {prefix: CMDTY.WHEAT_RU.FUT., currency: RUB, unit: t, vol_prefix: VOL.WHEAT_RU., tradeable_hedge: false,
+             seasonality_dataset: seasonality_wheat_ru}
+  POWER_EU_ZONE1: {prefix: CMDTY.POWER_EU_ZONE1.FUT., currency: RUB, unit: mwh, vol_prefix: VOL.POWER_EU_ZONE1., tradeable_hedge: false,
+                   seasonality_dataset: seasonality_power_zone1}
+
+equities:
+  SBER:  {spot: EQ.SBER.SPOT, dividends_prefix: EQ.SBER.DIV., borrow: EQ.SBER.BORROW, vol_prefix: VOL.SBER.SLICE., currency: RUB, discount: RUB.RUSFAR}
+  GAZP:  {spot: EQ.GAZP.SPOT, dividends_prefix: EQ.GAZP.DIV., borrow: EQ.GAZP.BORROW, vol_prefix: VOL.GAZP.SLICE., currency: RUB, discount: RUB.RUSFAR}
+  IMOEX: {spot: EQ.IMOEX.SPOT, dividends_prefix: EQ.IMOEX.DIV., borrow: EQ.IMOEX.BORROW, vol_prefix: VOL.IMOEX.SLICE., currency: RUB, discount: RUB.RUSFAR}
+
+credit:
+  entities_dataset: credit_entities
+  rating_tables_dataset: rating_pd
+  ofz_curve: CURVE.RUB.KBD
+  default_recovery: 0.4

@@ -1,0 +1,31 @@
+meta:
+  name: "TARF — форвард с целевым погашением"
+  asset_class: fx
+  group: "Валютные"
+  description: "Покупка валюты по курсу лучше форварда с плечом ниже страйка; автопогашение при достижении накопленной выгоды. Правило последнего платежа заметно меняет цену."
+  params:
+    trade_id: {type: str, default: "TARF-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 81.1}
+    leverage: {type: float, default: 2.0}
+    target: {type: float, default: 8.0, label: "Цель, руб. на USD накопленной выгоды"}
+    last_payment: {type: str, default: "partial", choices: [full, partial, none]}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 12}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "TARF {{ pair }} {{ strike }}, цель {{ target }}, плечо ×{{ leverage }}"
+  purpose: {type: buy_fx, exposure_notional: {{ notional * months }}}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  modifiers: [{type: target, level: {{ target }}, measure: gain_per_unit, last_payment: "{{ last_payment }}"}]
+  model: {paths: 40000}
+  legs:
+    - name: strip
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: call, strike: {{ strike }}, position: long}
+        - {kind: put, strike: {{ strike }}, position: short, notional_multiplier: {{ leverage }}}

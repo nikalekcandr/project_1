@@ -1,0 +1,27 @@
+meta:
+  name: "Participating forward"
+  asset_class: fx
+  group: "Валютные"
+  description: "Защита на всём номинале, участие в благоприятном движении на доле номинала."
+  params:
+    trade_id: {type: str, default: "PF-001"}
+    client: {type: str, default: "CLIENT_IMPORT"}
+    pair: {type: str, default: "USDRUB"}
+    notional: {type: float, default: 1000000}
+    strike: {type: float, default: 90.0}
+    participation: {type: float, default: 0.5}
+    start: {type: date, default: "2026-10-15"}
+    months: {type: int, default: 6}
+trade: |
+  identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
+  product: "Participating forward {{ pair }} {{ strike }} ({{ (participation*100)|int }}%)"
+  purpose: {type: buy_fx}
+  underlyings: {X: {asset_class: fx, id: "{{ pair }}", fixing: {source: CBR, lag_days: -1}}}
+  legs:
+    - name: strip
+      underlying: X
+      schedule: {start: "{{ start|d }}", end: "{{ add_months(start, months)|d }}", frequency: 1M, calendar: RU, payment_lag: 1}
+      notional: {currency: "{{ pair[:3] }}", amount: {{ notional }}}
+      components:
+        - {kind: call, strike: {{ strike }}, position: long}
+        - {kind: put, strike: {{ strike }}, position: short, notional_multiplier: {{ 1 - participation }}}
