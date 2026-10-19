@@ -125,44 +125,41 @@ def touch_price(S: float, H: float, T: float, r: float, q: float, sigma: float, 
 # Двойной барьер
 # ---------------------------------------------------------------------------
 
+def _wterm(logw: float, diff: float) -> float:
+    """exp(logw)·diff без переполнения: при больших μ (низкая вола и высокий
+    дифференциал ставок, типично для рубля) степени (U/L)^(nμ) выходят за double."""
+    if diff == 0.0:
+        return 0.0
+    return float(np.sign(diff) * np.exp(logw + np.log(abs(diff))))
+
+
 def double_barrier_ko(S: float, X: float, L: float, U: float, T: float, r: float, q: float, sigma: float, cp: int,
                       n_terms: int = 10) -> float:
-    """Ikeda-Kunitomo: knock-out при касании L или U (плоские границы)."""
+    """Ikeda-Kunitomo: knock-out при касании L или U (плоские границы); ряд в логарифмах."""
     if S <= L or S >= U:
         return 0.0
     b = r - q
     sT = sigma * np.sqrt(T)
-    mu1 = 2 * b / sigma ** 2 + 1
-    mu3 = mu1
+    mu = 2 * b / sigma ** 2 + 1
     eb = np.exp((b - r) * T)
     er = np.exp(-r * T)
+    lS, lX, lL, lU = np.log(S), np.log(X), np.log(L), np.log(U)
+    lE = lU if cp == 1 else lL           # граница, отсекающая выплату
+    c = (b + 0.5 * sigma ** 2) * T
     s1 = s2 = 0.0
     for n in range(-n_terms, n_terms + 1):
-        un, ln_ = U ** n, L ** n
+        a = lS + 2 * n * (lU - lL)                    # ln(S·U^2n / L^2n)
+        g = (2 * n + 2) * lL - lS - 2 * n * lU        # ln(L^(2n+2) / (S·U^2n))
+        lr1 = n * (lU - lL)                           # ln(U^n / L^n)
+        lr3 = (n + 1) * lL - n * lU - lS              # ln(L^(n+1) / (U^n·S))
         if cp == 1:
-            Fb = U
-            d1 = (np.log(S * U ** (2 * n) / (X * L ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            d2 = (np.log(S * U ** (2 * n) / (Fb * L ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            d3 = (np.log(L ** (2 * n + 2) / (X * S * U ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            d4 = (np.log(L ** (2 * n + 2) / (Fb * S * U ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            r1 = (un / ln_) ** mu1
-            r3 = (L ** (n + 1) / (un * S)) ** mu3
-            s1 += r1 * (N(d1) - N(d2)) - r3 * (N(d3) - N(d4))
-            r1b = (un / ln_) ** (mu1 - 2)
-            r3b = (L ** (n + 1) / (un * S)) ** (mu3 - 2)
-            s2 += r1b * (N(d1 - sT) - N(d2 - sT)) - r3b * (N(d3 - sT) - N(d4 - sT))
+            d1, d2 = (a - lX + c) / sT, (a - lE + c) / sT
+            d3, d4 = (g - lX + c) / sT, (g - lE + c) / sT
         else:
-            E = L
-            y1 = (np.log(S * U ** (2 * n) / (E * L ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            y2 = (np.log(S * U ** (2 * n) / (X * L ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            y3 = (np.log(L ** (2 * n + 2) / (E * S * U ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            y4 = (np.log(L ** (2 * n + 2) / (X * S * U ** (2 * n))) + (b + 0.5 * sigma ** 2) * T) / sT
-            r1b = (un / ln_) ** (mu1 - 2)
-            r3b = (L ** (n + 1) / (un * S)) ** (mu3 - 2)
-            s2 += r1b * (N(y1 - sT) - N(y2 - sT)) - r3b * (N(y3 - sT) - N(y4 - sT))
-            r1 = (un / ln_) ** mu1
-            r3 = (L ** (n + 1) / (un * S)) ** mu3
-            s1 += r1 * (N(y1) - N(y2)) - r3 * (N(y3) - N(y4))
+            d1, d2 = (a - lE + c) / sT, (a - lX + c) / sT
+            d3, d4 = (g - lE + c) / sT, (g - lX + c) / sT
+        s1 += _wterm(mu * lr1, N(d1) - N(d2)) - _wterm(mu * lr3, N(d3) - N(d4))
+        s2 += _wterm((mu - 2) * lr1, N(d1 - sT) - N(d2 - sT)) - _wterm((mu - 2) * lr3, N(d3 - sT) - N(d4 - sT))
     if cp == 1:
         v = S * eb * s1 - X * er * s2
     else:

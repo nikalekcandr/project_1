@@ -7,7 +7,7 @@
     prism price trade.yaml [--snapshot ID] [--report r.html] [--json r.json] [--record rec.json] [--fast|--price-only]
     prism replay rec.json               воспроизвести оценку «бит в бит»
     prism compare a.yaml b.yaml ...     сравнить пакеты (кредит + хедж) разных банков
-    prism portfolio DIR [--xva]         переоценка портфеля
+    prism portfolio DIR [--xva] [--workers N]   переоценка портфеля (параллельно)
     prism validate                      арбитражные проверки, сверка с QuantLib, регрессия
     prism serve [--port 8000]           веб-интерфейс
 """
@@ -194,26 +194,50 @@ def cmd_compare(args):
         Path(args.json).write_text(json.dumps(res, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
 
 
+def _price_files(job):
+    """Переоценка части портфеля в отдельном процессе: свой контекст рынка на том же снапшоте (детерминизм — seed сделки)."""
+    import warnings
+    from .instruments.schema import load_trade
+    from .marketdata.context import MarketContext
+    from .marketdata.store import SnapshotStore
+    from .pricing.engine import price_trade
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+    store_dir, snap_id, files, paths = job
+    ctx = MarketContext(SnapshotStore(store_dir).load(snap_id))
+    out = []
+    for f in files:
+        try:
+            tr = load_trade(f)
+            t = time.time()
+            r = price_trade(tr, ctx, mc_overrides={"paths": paths} if paths else None)
+            out.append((f, [tr.identification.trade_id, tr.product[:48], r.engine, _fmt(r.value), f"{(time.time() - t) * 1000:.0f}"], True))
+        except Exception as e:
+            out.append((f, [Path(f).stem, f"ОШИБКА: {e}"[:60], "", "", ""], False))
+    return out
+
+
 def cmd_portfolio(args):
     from .instruments.schema import load_trade
     from .marketdata.context import MarketContext
-    from .pricing.engine import price_trade
     snap = _snapshot(args)
-    ctx = MarketContext(snap)
-    files = sorted(Path(args.dir).glob("*.yaml"))
+    files = [str(f) for f in sorted(Path(args.dir).glob("*.yaml"))]
     t0 = time.time()
-    rows, trades = [], []
-    for f in files:
-        try:
-            tr = load_trade(str(f))
-            t = time.time()
-            r = price_trade(tr, ctx, mc_overrides={"paths": args.paths} if args.paths else None)
-            rows.append([tr.identification.trade_id, tr.product[:48], r.engine, _fmt(r.value), f"{(time.time() - t) * 1000:.0f}"])
-            trades.append(tr)
-        except Exception as e:
-            rows.append([f.stem, f"ОШИБКА: {e}"[:60], "", "", ""])
+    store_dir = str(_store(args).root)
+    workers = max(1, min(args.workers or 1, len(files) or 1))
+    if workers == 1:
+        res = _price_files((store_dir, snap.id, files, args.paths))
+    else:
+        from concurrent.futures import ProcessPoolExecutor
+        chunks = [files[i::workers] for i in range(workers)]
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            res = [r for part in ex.map(_price_files, [(store_dir, snap.id, c, args.paths) for c in chunks]) for r in part]
+        order = {f: i for i, f in enumerate(files)}
+        res.sort(key=lambda r: order[r[0]])
+    rows = [r[1] for r in res]
+    trades = [load_trade(f) for f, _, ok in res if ok]
+    ctx = MarketContext(snap)
     _print_table(["сделка", "продукт", "движок", "стоимость", "мс"], rows)
-    print(f"сделок: {len(trades)}, время: {time.time() - t0:.1f} с")
+    print(f"сделок: {len(trades)}, процессов: {workers}, время: {time.time() - t0:.1f} с")
     if args.xva and trades:
         from .xva.engine import compute_xva
         by_ns: dict[str, list] = {}
@@ -227,7 +251,7 @@ def cmd_portfolio(args):
 
 def cmd_validate(args):
     from .validation.suite import run_suite
-    ok = run_suite(quick=args.quick, verbose=True)
+    ok = run_suite(quick=args.quick, verbose=True, update_golden=args.update_golden, reason=args.reason or "")
     sys.exit(0 if ok else 1)
 
 
@@ -283,9 +307,12 @@ def main(argv=None):
     s.add_argument("--snapshot")
     s.add_argument("--xva", action="store_true")
     s.add_argument("--paths", type=int)
+    s.add_argument("--workers", type=int, default=1, help="число процессов для параллельной переоценки")
     s.set_defaults(fn=cmd_portfolio)
     s = sub.add_parser("validate", help="набор проверок и сверок")
     s.add_argument("--quick", action="store_true")
+    s.add_argument("--update-golden", action="store_true", help="перезаписать эталонные цены (требует --reason)")
+    s.add_argument("--reason", help="причина изменения эталонов — сохраняется в истории golden.json")
     s.set_defaults(fn=cmd_validate)
     s = sub.add_parser("serve", help="веб-интерфейс")
     s.add_argument("--host", default="127.0.0.1")

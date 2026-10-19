@@ -1,0 +1,25 @@
+# Mark-to-market кросс-валютный своп RUB/CNY: рублёвый номинал на каждом периоде = N₀·X(tᵢ)/X(t₀),
+# разница номиналов обменивается в даты ресета. Аналитика (детерминированные ставки) и МК совпадают.
+identification: {trade_id: MTMCCS-001, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: '2026-10-15'}
+product: 'MtM CCS: CNY фикс против КС, рублёвый номинал ресетится по курсу CNYRUB
+  каждые 6 мес.'
+underlyings:
+  KS: {asset_class: rate, id: KEYRATE}
+legs:
+- name: cny_fixed
+  currency: CNY
+  schedule: {start: '2026-10-19', end: '2029-10-19', frequency: 6M, calendar: RU+CN,
+    daycount: ACT/360}
+  notional: {currency: CNY, amount: 100000000.0}
+  exchange_notional: both
+  components:
+  - {kind: fixed, rate: 0.035, position: short}
+- name: rub_float
+  underlying: KS
+  schedule: {start: '2026-10-19', end: '2029-10-19', frequency: 6M, calendar: RU}
+  notional: {currency: RUB, amount: 1152000000.0}
+  exchange_notional: both
+  components:
+  - {kind: float, position: long}
+  notional_reset: true
+  reset_pair: CNYRUB

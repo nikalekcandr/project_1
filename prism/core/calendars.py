@@ -57,6 +57,8 @@ class BusinessCalendar:
 
     def coverage_flags(self, dates: Iterable[date]) -> list[str]:
         """Пометки для дат, попадающих в экстраполированные годы."""
+        if self.code == "WEEKENDS":      # намеренно без праздников (например, индексы, публикуемые каждый будний день)
+            return []
         years = sorted({d.year for d in dates})
         out = []
         for y in years:

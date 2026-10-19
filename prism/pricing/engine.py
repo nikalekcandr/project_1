@@ -7,7 +7,6 @@ auto: аналитика, если структура ею покрываетс�
 from __future__ import annotations
 
 import time
-from typing import Any
 
 from ..core.provenance import InputTracker
 from ..instruments.schema import EarlyTerminationMod, ExerciseMod, Trade

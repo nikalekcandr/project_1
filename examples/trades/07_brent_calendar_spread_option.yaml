@@ -1,0 +1,14 @@
+# Календарный спред-опцион на Brent: колл на разницу июньского и декабрьского контрактов 2027 —
+# два базиса с contract_month и наблюдаемая spread; оценка по Кирку (Блэк неприменим: спред бывает < 0).
+identification: {trade_id: CSO-1, client: CLIENT_ENERGY, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Calendar spread option Brent Jun27 − Dec27"
+underlyings:
+  A: {asset_class: commodity, id: BRENT, contract_month: "2027-06"}
+  B: {asset_class: commodity, id: BRENT, contract_month: "2027-12"}
+legs:
+  - name: opt
+    observable: {type: spread, terms: [{name: A, coef: 1.0}, {name: B, coef: -1.0}]}
+    currency: USD
+    schedule: {dates: ["2027-04-15"], calendar: WEEKENDS}
+    notional: {currency: USD, amount: 100000}
+    components: [{kind: call, strike: 0.5}]

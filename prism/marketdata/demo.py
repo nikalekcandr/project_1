@@ -158,8 +158,8 @@ def build_demo_snapshot(as_of: datetime | None = None, *, day_shift: int = 0, no
 
     # ------------------------------------------------------------------ FX
     fx_spec = {
-        "USDRUB": (82.50, "USD", -0.0120, 0.10, "RU+US", "Внебиржевой рынок / ЦБ РФ (USD/RUB торгуется вне биржи)"),
-        "EURRUB": (96.10, "EUR", -0.0100, 0.12, "RU+TARGET", "Внебиржевой рынок / ЦБ РФ"),
+        "USDRUB": (82.50, "USD", -0.0120, 0.03, "RU+US", "Внебиржевой рынок / ЦБ РФ (USD/RUB торгуется вне биржи)"),
+        "EURRUB": (96.10, "EUR", -0.0100, 0.04, "RU+TARGET", "Внебиржевой рынок / ЦБ РФ"),
         "CNYRUB": (11.52, "CNY", -0.0060, 0.005, "RU+CN", "Мосбиржа: CNYRUB_TOM, режим CETS"),
     }
     fx_spots = {}
@@ -171,7 +171,6 @@ def build_demo_snapshot(as_of: datetime | None = None, *, day_shift: int = 0, no
         q.append(Quote(f"FX.{pair}.SPOT", spot, _p(src, ts_moex), "price", bid=round(spot - hs, 4), ask=round(spot + hs, 4),
                        meta={"settlement": "TOM"}))
         tf = true_foreign[fccy]
-        dcf = 360.0 if fccy in ("USD", "EUR") else 365.0
         for tenor in ["1W", "2W", "1M", "2M", "3M", "6M", "9M", "1Y", "18M", "2Y", "3Y"]:
             d = add_tenor(sd, tenor, cal)
             t_s, t_d = (sd - ref).days / 365.0, (d - ref).days / 365.0
@@ -179,7 +178,7 @@ def build_demo_snapshot(as_of: datetime | None = None, *, day_shift: int = 0, no
             gross_f = float(tf.df(t_s) / tf.df(t_d))
             fwd = spot * gross_d / gross_f
             pts = round(fwd - spot, 4)
-            hsp = round(max(abs(pts) * 0.02, hs * 0.2), 4)
+            hsp = round(max(abs(pts) * 0.01, hs * 0.2), 4)
             q.append(Quote(f"FX.{pair}.FWD.{tenor}", pts, _p(f"{src}: форвардные пункты (своп)", ts_moex), "points",
                            bid=round(pts - hsp, 4), ask=round(pts + hsp, 4), meta={"tenor": tenor}))
         q.append(Quote(f"FX.{pair}.FIX.CBR", round(spot * 0.999, 4),

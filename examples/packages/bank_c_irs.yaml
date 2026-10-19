@@ -1,0 +1,33 @@
+# Банк В: кредит КС + 2.2% с обязательным процентным свопом (фиксация 14.3%)
+package_id: "В: КС+2.20% + своп 14.30%"
+bank: "Банк В"
+kind: loan_with_hedge
+members:
+  - role: loan
+    trade:
+      identification: {trade_id: C-LOAN, client: CLIENT_METAL, bank: BANK_OTHER, trade_date: "2026-10-15"}
+      product: "Кредит КС + 2.20%"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: interest
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          exchange_notional: both
+          components: [{kind: float, spread: 0.022, position: short}]
+  - role: derivative
+    trade:
+      identification: {trade_id: C-IRS, client: CLIENT_METAL, bank: BANK_OTHER, trade_date: "2026-10-15"}
+      product: "IRS: клиент платит 14.30%, получает КС"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: fixed
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          components: [{kind: fixed, rate: 0.143, position: short}]
+        - name: float
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          components: [{kind: float, position: long}]

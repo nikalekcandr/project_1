@@ -1,0 +1,19 @@
+# Accumulator на золото: ежедневное накопление по 3 550 USD, двойной объём ниже страйка, отключение
+# при касании 3 900 — те же модификаторы accrual/leverage/barrier, что у валютного accumulator.
+identification: {trade_id: GACC-1, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Accumulator на золото: накопление по 3 550, KO 3 900, плечо ×2 ниже страйка"
+underlyings: {G: {asset_class: commodity, id: GOLD}}
+model: {paths: 8000}
+legs:
+  - name: acc
+    underlying: G
+    currency: USD
+    schedule: {start: "2026-10-16", end: "2027-04-16", frequency: 1M, calendar: WEEKENDS, observation: daily}
+    notional: {currency: USD, amount: 100}
+    components:
+      - kind: forward
+        strike: 3550
+        modifiers:
+          - {type: accrual}
+          - {type: leverage, factor: 2.0, when: below, threshold: 3550}
+    modifiers: [{type: barrier, kind: out, direction: up, level: 3900, monitoring: discrete, observation: daily}]

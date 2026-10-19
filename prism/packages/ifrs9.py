@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from ..instruments.schema import BarrierMod, LeverageMod, Trade
+from ..instruments.schema import BarrierMod, CapFloorMod, LeverageMod, Trade
 
 
 @dataclass
@@ -44,6 +44,22 @@ def _leveraged(tr: Trade) -> bool:
     return False
 
 
+def _caps_floors(tr: Trade) -> list[tuple[str, float, str]]:
+    """Кэпы/флоры на ставку: отдельные компоненты и модификаторы cap_floor на купоне (ставка «всё включено»)."""
+    out = []
+    for leg in tr.legs:
+        for c in leg.components:
+            if c.kind in ("cap", "floor"):
+                out.append((c.kind, float(c.strike), f"нога {leg.name}"))
+            for m in c.modifiers:
+                if isinstance(m, CapFloorMod) and m.unit == "rate":
+                    if m.local_cap is not None:
+                        out.append(("cap", m.local_cap, f"на купон ноги {leg.name}"))
+                    if m.local_floor is not None:
+                        out.append(("floor", m.local_floor, f"на купон ноги {leg.name}"))
+    return out
+
+
 def assess_embedded(derivative: Trade, host_type: str, *, fair_value: float, model_based_inputs: list[str],
                     market_rate_at_inception: float | None = None, functional_currency: str = "RUB",
                     host_goods_currency: str | None = None, engine: str = "") -> IFRS9Assessment:
@@ -64,25 +80,25 @@ def assess_embedded(derivative: Trade, host_type: str, *, fair_value: float, mod
     else:
         cr = True
         if "rate" in classes:
-            caps = [c for l in derivative.legs for c in l.components if c.kind in ("cap", "floor")]
+            caps = _caps_floors(derivative)
             if lev:
                 cr = False
                 rationale.append("Процентная составляющая с плечом: не тесно связана (B4.3.8(a)).")
                 paras.append("B4.3.8(a)")
-            for c in caps:
+            for kind, strike, where in caps:
+                name = "Кэп" if kind == "cap" else "Флор"
+                paras.append("B4.3.8(b)")
                 if market_rate_at_inception is None:
-                    judgement.append("Нужна рыночная ставка на дату заключения для сравнения со страйком кэпа/флора")
+                    judgement.append(f"{name} {strike:.2%} ({where}): нужна рыночная ставка на дату заключения "
+                                     "для сравнения (B4.3.8(b)) — вывод о тесной связи не сделан")
                     continue
-                if c.kind == "cap" and c.position == "short" and c.strike < market_rate_at_inception:
-                    pass
-                if (c.kind == "cap" and c.strike >= market_rate_at_inception) or (c.kind == "floor" and c.strike <= market_rate_at_inception):
-                    rationale.append(f"{'Кэп' if c.kind == 'cap' else 'Флор'} {c.strike:.2%} вне денег на дату заключения "
+                if (kind == "cap" and strike >= market_rate_at_inception) or (kind == "floor" and strike <= market_rate_at_inception):
+                    rationale.append(f"{name} {strike:.2%} ({where}) вне денег на дату заключения "
                                      f"(рыночная ставка {market_rate_at_inception:.2%}) и без плеча — тесно связан (B4.3.8(b)).")
                 else:
                     cr = False
-                    rationale.append(f"{'Кэп' if c.kind == 'cap' else 'Флор'} {c.strike:.2%} в деньгах на дату заключения "
+                    rationale.append(f"{name} {strike:.2%} ({where}) в деньгах на дату заключения "
                                      f"(рыночная ставка {market_rate_at_inception:.2%}) — не тесно связан (B4.3.8(b)).")
-                paras.append("B4.3.8(b)")
             if any(isinstance(m, BarrierMod) for l in derivative.legs for c in l.components for m in c.modifiers):
                 cr = False
                 rationale.append("Барьерное условие (отключение защиты) изменяет денежные потоки нелинейно — "
@@ -124,7 +140,8 @@ def assess_embedded(derivative: Trade, host_type: str, *, fair_value: float, mod
         paras.append("4.3.3")
         rationale.append("Отделение требуется, так как встроенный дериватив не тесно связан, гибридный договор не "
                          "оценивается по ССЧПУ, и отдельный инструмент с теми же условиями был бы деривативом (4.3.3)."
-                         if separate else "Встроенный дериватив тесно связан с основным договором — не отделяется (4.3.3(a)).")
+                         if separate else "Встроенный дериватив тесно связан с основным договором — не отделяется (4.3.3(a))"
+                         + ("; вывод предварительный — см. пункты, требующие суждения." if judgement else "."))
     level = 3 if model_based_inputs else 2
     return IFRS9Assessment(host_type, separate, cr, rationale, sorted(set(paras)), fair_value, level,
                            engine or "модель оценки", model_based_inputs, judgement)

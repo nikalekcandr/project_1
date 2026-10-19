@@ -9,3 +9,4 @@ dist/
 /out/
 *.record.json
 !examples/**/*.record.json
+/snapshots/

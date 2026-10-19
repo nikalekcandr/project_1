@@ -27,7 +27,13 @@ class LocalVolGrid:
 
     def __call__(self, t: float, k: np.ndarray) -> np.ndarray:
         i = min(int(np.searchsorted(self.times, t, side="left")), len(self.times) - 1)
-        return np.interp(k, self.ks, self.lv[i])
+        row = self.lv[i]
+        # равномерная сетка по k: индекс напрямую, без бинарного поиска (горячий цикл Монте-Карло); за краями — плоско
+        u = np.clip((np.asarray(k, float) - self.ks[0]) * ((len(self.ks) - 1) / (self.ks[-1] - self.ks[0])), 0.0,
+                    len(self.ks) - 1 - 1e-12)
+        j = u.astype(np.intp)
+        f = u - j
+        return row[j] + f * (row[j + 1] - row[j])
 
 
 def dupire_grid(surf: VolSurface, t_max: float, n_t: int = 48, k_width: float = 5.0, n_k: int = 161,

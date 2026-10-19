@@ -14,9 +14,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
-from typing import Any, Callable
 
 import numpy as np
 
@@ -104,7 +102,7 @@ def parity_and_barrier_checks(ctx, res: SuiteResult) -> None:
 
 
 def _fwd_same_dates(ctx) -> float:
-    from ..instruments.templates import build, render
+    from ..instruments.templates import render
     from ..instruments.schema import load_trade
     from ..pricing.engine import price_trade
     d = render("fx_vanilla", {"option": "call", "strike": 88.0})
@@ -270,7 +268,7 @@ def high_rate_stability(res: SuiteResult) -> None:
     res.add("устойчивость", "аналитика и PDE при ставках 0–45%", ok and worst < 2e-3, f"макс. |PDE − аналитика| {worst:.2e}")
 
 
-def regression(ctx, res: SuiteResult, update: bool = False, tol_rel: float = 1e-8) -> None:
+def regression(ctx, res: SuiteResult, update: bool = False, tol_rel: float = 1e-8, reason: str = "") -> None:
     from ..instruments.templates import build
     from ..pricing.engine import price_trade
     ids = ["fx_forward", "ndf", "fx_vanilla", "fx_barrier", "fx_double_barrier", "fx_touch", "fx_dnt", "fx_collar", "fx_forward_extra",
@@ -282,10 +280,21 @@ def regression(ctx, res: SuiteResult, update: bool = False, tol_rel: float = 1e-
         r = price_trade(build(tid), ctx, mc_overrides={"paths": 8000})
         vals[tid] = r.value
     if update or not GOLDEN_PATH.exists():
+        if GOLDEN_PATH.exists() and not reason.strip():
+            raise ValueError("обновление эталонов требует явной причины (--reason)")
+        from datetime import datetime, timezone
+        from ..version import code_version
+        old = json.loads(GOLDEN_PATH.read_text(encoding="utf-8")) if GOLDEN_PATH.exists() else {}
+        changed = {k: {"old": old.get("values", {}).get(k), "new": v} for k, v in vals.items()
+                   if old.get("values", {}).get(k) is None or abs(v - old["values"][k]) > tol_rel * max(abs(old["values"][k]), 1.0)}
+        history = list(old.get("history", []))
+        history.append({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "reason": reason or "первичная запись",
+                        "code": code_version().get("source_hash"), "changed": changed})
         GOLDEN_PATH.parent.mkdir(parents=True, exist_ok=True)
         GOLDEN_PATH.write_text(json.dumps({"snapshot": ctx.snapshot.id, "snapshot_hash": ctx.snapshot.content_hash,
-                                           "mc_paths": 8000, "values": vals}, ensure_ascii=False, indent=1), encoding="utf-8")
-        res.add("регрессия", "эталонные цены записаны", True, str(GOLDEN_PATH))
+                                           "mc_paths": 8000, "values": vals, "history": history}, ensure_ascii=False, indent=1),
+                               encoding="utf-8")
+        res.add("регрессия", "эталонные цены записаны", True, f"{GOLDEN_PATH}; изменено: {len(changed)}; причина: {reason}")
         return
     gold = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))
     if gold["snapshot_hash"] != ctx.snapshot.content_hash:
@@ -300,7 +309,7 @@ def regression(ctx, res: SuiteResult, update: bool = False, tol_rel: float = 1e-
         res.add("регрессия", tid, ok, "" if ok else f"эталон {g:,.4f}, сейчас {v:,.4f}: требуется подтверждение и запись причины")
 
 
-def run_suite(quick: bool = False, verbose: bool = False, update_golden: bool = False) -> bool:
+def run_suite(quick: bool = False, verbose: bool = False, update_golden: bool = False, reason: str = "") -> bool:
     from ..marketdata.context import MarketContext
     from ..marketdata.demo import build_demo_snapshot
     res = SuiteResult()
@@ -311,7 +320,7 @@ def run_suite(quick: bool = False, verbose: bool = False, update_golden: bool = 
     high_rate_stability(res)
     if not quick:
         mc_vs_analytic(ctx, res)
-        regression(ctx, res, update=update_golden)
+        regression(ctx, res, update=update_golden, reason=reason)
     if verbose:
         cur = None
         for c in res.checks:

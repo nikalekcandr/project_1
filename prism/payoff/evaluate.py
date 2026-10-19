@@ -23,7 +23,7 @@ import numpy as np
 from ..core.calendars import get_calendar
 from ..core.schedule import roll_dates
 from ..core.dates import BDC
-from ..instruments.schema import (AccrualMod, AutocallMod, AveragingMod, BarrierMod, CapFloorMod, Component,
+from ..instruments.schema import (AccrualMod, AutocallMod, BarrierMod, CapFloorMod, Component,
                                   EarlyTerminationMod, ExerciseMod, LeverageMod, MemoryMod, StrikeResetMod, TargetMod)
 from .compile import CLeg, CPeriod, CProduct
 
@@ -259,6 +259,10 @@ class Evaluator:
             w = np.asarray(p.obs_weights) if p.obs_weights else np.full(len(p.obs_dates), 1 / len(p.obs_dates))
             if avg.method == "geometric":
                 a = np.exp(np.log(vals) @ w)
+            elif avg.method == "max":
+                a = vals.max(axis=1)
+            elif avg.method == "min":
+                a = vals.min(axis=1)
             else:
                 a = vals @ w
             if avg.average_of == "strike":
@@ -419,7 +423,7 @@ class Evaluator:
                             global_acc[ci] = global_acc.get(ci, np.zeros(self.mv.n)) + unit_pay
                             if p is alive_periods[-1]:
                                 unit_pay = unit_pay + np.maximum(m.global_floor - global_acc[ci], 0.0)
-                    amt = sign * p.notional * mult * unit_pay
+                    amt = sign * p.notional * self._reset_factor(leg, p) * mult * unit_pay
                     gain = np.maximum(sign * raw, 0.0) if sign > 0 else None
                     out.append(Flow(li, ci, p.idx, p.fixing, p.payment, p.start, leg.currency, amt, "component",
                                     f"{leg.name}/{c.kind}{'/' + c.label if c.label else ''}", gain))
@@ -450,8 +454,16 @@ class Evaluator:
             w = np.full(len(ds), 1 / len(ds))
         return inr @ w
 
+    def _reset_factor(self, leg: CLeg, p: CPeriod) -> np.ndarray | float:
+        """MtM-ресет: номинал периода = N₀·X(начало периода)/X(начало первого периода) по траектории курса."""
+        if not leg.spec.notional_reset:
+            return 1.0
+        src = (leg.settlement.fixing_source if leg.settlement else None) or "CBR"
+        x0 = self.mv.fx_value(leg.spec.reset_pair, leg.periods[0].start, src)
+        return self.mv.fx_value(leg.spec.reset_pair, p.start, src) / x0
+
     def _notional_flows(self, li: int, leg: CLeg) -> list[Flow]:
-        """Обмен номиналами: −N в начале, амортизация и +N в конце (знак — по направлению ноги)."""
+        """Обмен номиналами: −N в начале, амортизация (или MtM-ресет) и +N в конце (знак — по направлению ноги)."""
         ex = leg.spec.exchange_notional
         if ex == "none" or not leg.periods:
             return []
@@ -459,22 +471,22 @@ class Evaluator:
         out = []
         ps = leg.periods
         n = self.mv.n
+        notional = [p.notional * self._reset_factor(leg, p) for p in ps]
         if ex in ("initial", "both") and ps[0].start > self.ref:
-            out.append(Flow(li, -1, 0, ps[0].start, ps[0].start, ps[0].start, leg.currency, np.full(n, -sign * ps[0].notional),
-                            "notional", f"{leg.name}/выдача номинала"))
+            out.append(Flow(li, -1, 0, ps[0].start, ps[0].start, ps[0].start, leg.currency,
+                            np.broadcast_to(-sign * notional[0], (n,)).astype(float), "notional", f"{leg.name}/выдача номинала"))
         if ex in ("final", "both"):
             for i, p in enumerate(ps):
-                nxt = ps[i + 1].notional if i + 1 < len(ps) else 0.0
-                amort = p.notional - nxt
-                if abs(amort) > 0 and p.payment > self.ref:
-                    out.append(Flow(li, -1, p.idx, p.fixing, p.payment, p.start, leg.currency, np.full(n, sign * amort),
-                                    "notional", f"{leg.name}/погашение номинала"))
+                nxt = notional[i + 1] if i + 1 < len(ps) else 0.0
+                amort = np.broadcast_to(notional[i] - nxt, (n,)).astype(float)
+                if np.any(np.abs(amort) > 0) and p.payment > self.ref:
+                    out.append(Flow(li, -1, p.idx, p.fixing, p.payment, p.start, leg.currency, sign * amort,
+                                    "notional", f"{leg.name}/{'ресет' if i + 1 < len(ps) and leg.spec.notional_reset else 'погашение'} номинала"))
         return out
 
     # ------------------------------------------------------------------ модификаторы уровня сделки
     def _structure(self, flows: list[Flow]) -> list[Flow]:
         mods = self.p.modifiers
-        n = self.mv.n
         for m in mods:
             if isinstance(m, BarrierMod):
                 obs = m.observable or self.p.legs[0].observable

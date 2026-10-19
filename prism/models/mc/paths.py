@@ -134,14 +134,15 @@ class Simulator:
     def run(self) -> PathSet:
         k = len(self.assets) + len(self.rates)
         C, repaired = nearest_correlation(self.corr) if k > 1 else (self.corr, False)
-        L = np.linalg.cholesky(C + 1e-14 * np.eye(k)) if k > 1 else np.ones((1, 1))
+        L = np.linalg.cholesky(C + 1e-14 * np.eye(k)) if k > 1 else np.eye(k)
         rng = np.random.Generator(np.random.PCG64(self.seed))
         times = np.concatenate([[0.0], self.grid])
         dts = np.diff(times)
         n = self.n_paths
         half = n // 2 if self.antithetic else n
         nt = len(self.grid)
-        X = {a.name: np.zeros((n, nt + 1)) for a in self.assets}
+        # раскладка [шаг, путь]: запись шага — непрерывный блок памяти; наружу — транспонированные виды [путь, шаг]
+        X = {a.name: np.zeros((nt + 1, n)) for a in self.assets}
         step_vol: dict[str, np.ndarray] = {}
         # детерминированные волатильности для black
         bvol = {}
@@ -152,7 +153,7 @@ class Simulator:
                 bvol[a.name] = np.sqrt(fv)
                 step_vol[a.name] = np.sqrt(fv)[None, :]
             else:
-                step_vol[a.name] = np.zeros((n, nt))
+                step_vol[a.name] = np.zeros((nt, n))
         hx = {r.name: np.zeros((n, nt + 1)) for r in self.rates}
         hint = {r.name: np.zeros((n, nt + 1)) for r in self.rates}
         hy = {r.name: r.y(times) for r in self.rates}
@@ -165,19 +166,19 @@ class Simulator:
             dt = dts[j]
             sq = np.sqrt(dt)
             for i, a in enumerate(self.assets):
-                xp = X[a.name][:, j]
+                xp = X[a.name][j]
                 if a.vol_mode == "black":
                     s = bvol[a.name][j]
-                    X[a.name][:, j + 1] = xp - 0.5 * s * s * dt + s * sq * z[i]
+                    X[a.name][j + 1] = xp - 0.5 * s * s * dt + s * sq * z[i]
                 else:
                     s = a.lv(times[j], xp)
-                    step_vol[a.name][:, j] = s
+                    step_vol[a.name][j] = s
                     xn = xp - 0.5 * s * s * dt + s * sq * z[i]
                     if self.martingale_correction:
                         c = np.log(np.mean(np.exp(xn)))
                         xn = xn - c
                         diag["martingale_corrections"].setdefault(a.name, []).append(float(c))
-                    X[a.name][:, j + 1] = xn
+                    X[a.name][j + 1] = xn
             for i2, r in enumerate(self.rates):
                 zi = z[len(self.assets) + i2]
                 xp = hx[r.name][:, j]
@@ -195,6 +196,10 @@ class Simulator:
                     m = np.mean(np.exp(-hint[r.name][:, j + 1]))
                     adj = np.log(m)
                     hint[r.name][:, j + 1] += adj
+        X = {nm: v.T for nm, v in X.items()}
+        for a in self.assets:
+            if a.vol_mode != "black":
+                step_vol[a.name] = step_vol[a.name].T
         values = {}
         for a in self.assets:
             F = np.asarray(a.forward(times), float)

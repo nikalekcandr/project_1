@@ -14,7 +14,6 @@ import json
 import math
 from typing import Any
 
-from ..core.provenance import DataKind
 from .svg import column_chart, diverging_cell, esc, fmt_num, hbar_chart, line_chart
 
 KIND_BADGE = {
@@ -82,7 +81,8 @@ def _cfo_summary(v) -> list[str]:
                        f"кредитный риск компании {_rub(b.credit)}, капитал и фондирование {_rub(b.capital + b.funding)}.")
             if b.residual > 0:
                 out.append(f"<b>Необоснованный остаток (наценка): {_rub(b.residual)}</b>"
-                           + (f" ≈ {b.residual_bp_pa:,.0f} б.п. годовых на номинал." if math.isfinite(b.residual_bp_pa) else "."))
+                           + (f" — {b.residual_pct_notional:.2%} номинала, ≈ {b.residual_bp_pa:,.0f} б.п. годовых на номинал-годы."
+                              .replace(",", " ") if math.isfinite(b.residual_bp_pa) else "."))
             else:
                 out.append("Обоснованные издержки покрывают передачу стоимости: явной сверхнаценки не выявлено.")
         else:
@@ -104,13 +104,13 @@ def _cfo_summary(v) -> list[str]:
 CSS = """
 :root{color-scheme:light;--bg:#fcfcfb;--card:#ffffff;--text:#0b0b0b;--text2:#52514e;--muted:#7a7974;--line:#e4e3df;--grid:#ecebe7;
 --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#6250d6;--ok:#0ca30c;--warn:#fab219;--serious:#ec835a;--crit:#d03b3b;
---div-pos:#2a78d6;--div-neg:#e34948;--div-mid:#f0efec;--zone-crit:rgba(208,59,59,.10);--zone-warn:rgba(236,131,90,.12);--accent-bg:#eef4fc}
+--div-pos:#2a78d6;--div-neg:#e34948;--div-mid:#f0efec;--zone-crit:rgba(208,59,59,.10);--zone-warn:rgba(236,131,90,.12);--zone-info:rgba(110,110,110,.08);--accent-bg:#eef4fc}
 @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;--bg:#1a1a19;--card:#222220;--text:#f0efec;--text2:#c3c2b7;--muted:#9a998f;
 --line:#383835;--grid:#2e2e2b;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#9085e9;--div-pos:#3987e5;--div-neg:#e66767;--div-mid:#383835;
---zone-crit:rgba(208,59,59,.20);--zone-warn:rgba(236,131,90,.18);--accent-bg:#1d2a3a}}
+--zone-crit:rgba(208,59,59,.20);--zone-warn:rgba(236,131,90,.18);--zone-info:rgba(200,200,200,.08);--accent-bg:#1d2a3a}}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#1a1a19;--card:#222220;--text:#f0efec;--text2:#c3c2b7;--muted:#9a998f;--line:#383835;--grid:#2e2e2b;
 --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#9085e9;--div-pos:#3987e5;--div-neg:#e66767;--div-mid:#383835;
---zone-crit:rgba(208,59,59,.20);--zone-warn:rgba(236,131,90,.18);--accent-bg:#1d2a3a}
+--zone-crit:rgba(208,59,59,.20);--zone-warn:rgba(236,131,90,.18);--zone-info:rgba(200,200,200,.08);--accent-bg:#1d2a3a}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 .wrap{max-width:1040px;margin:0 auto;padding:24px 16px 64px}
@@ -144,7 +144,7 @@ tr.hl td{background:var(--accent-bg)}
 .tick,.bar-l{fill:var(--text2);font-size:11.5px}.bar-v{fill:var(--text);font-size:12px;font-variant-numeric:tabular-nums}
 .axis-label{fill:var(--muted);font-size:12px}.ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .ln-muted{fill:none;stroke-width:1.5;stroke:var(--muted)!important}.vref{stroke:var(--muted);stroke-width:1}
-.vref-t{fill:var(--text2);font-size:11px}.zone-crit{fill:var(--zone-crit)}.zone-warn{fill:var(--zone-warn)}
+.vref-t{fill:var(--text2);font-size:11px}.zone-crit{fill:var(--zone-crit)}.zone-warn{fill:var(--zone-warn)}.zone-info{fill:var(--zone-info)}
 .xhair{stroke:var(--muted);stroke-width:1}.hit{fill:transparent;cursor:crosshair}
 .tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;
 box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap;z-index:5}.tip b{font-variant-numeric:tabular-nums}
@@ -170,7 +170,8 @@ JS = r"""
  function fmt(v,pct){if(v===null||v===undefined||!isFinite(v))return '—'; if(pct) return (v*100).toFixed(2)+'%';
    var a=Math.abs(v); if(a>=1e9) return (v/1e9).toFixed(2)+' млрд'; if(a>=1e6) return (v/1e6).toFixed(2)+' млн';
    if(a>=1e4) return (v/1e3).toFixed(0)+' тыс.'; if(a>=1) return v.toFixed(2); return v.toFixed(4);}
- document.querySelectorAll('figure.fig').forEach(function(fig){
+ function bind(root){ (root||document).querySelectorAll('figure.fig').forEach(function(fig){
+   if(fig.dataset.bound) return; fig.dataset.bound='1';
    var dEl=fig.querySelector('script.chart-data'); if(!dEl) return; var d=JSON.parse(dEl.textContent);
    var svg=fig.querySelector('svg.chart'); var tip=fig.querySelector('.tip'); var hit=svg.querySelector('.hit'); var xh=svg.querySelector('.xhair');
    function move(ev){var r=svg.getBoundingClientRect(); var sc=d.geom.width/r.width; var px=(ev.clientX-r.left)*sc;
@@ -180,7 +181,8 @@ JS = r"""
      var h='<div>'+fmt(d.x[i],d.pct_x)+'</div>'; d.series.forEach(function(s){h+='<div><span class="k" style="background:'+s.color+'"></span>'+s.label+': <b>'+fmt(s.y[i],d.pct_y)+'</b></div>';});
      tip.innerHTML=h; tip.hidden=false; var lx=(sxp/sc)+12; if(lx+tip.offsetWidth>r.width) lx=(sxp/sc)-tip.offsetWidth-12; tip.style.left=lx+'px'; tip.style.top='8px';}
    hit.addEventListener('mousemove',move); hit.addEventListener('mouseleave',function(){tip.hidden=true; xh.setAttribute('visibility','hidden');});
- });
+ });}
+ window.prismBindCharts=bind; bind(document);
 })();
 """
 
@@ -205,7 +207,8 @@ def render_html(v) -> str:
         tiles.append(("Передача стоимости банку", _rub(b.transfer), "премия − mid", False))
         if b.transfer > 0:
             tiles.append(("Наценка сверх обоснованного", _rub(b.residual),
-                          f"{b.residual_bp_pa:,.0f} б.п. годовых на номинал".replace(",", " ") if math.isfinite(b.residual_bp_pa) else "", False))
+                          (f"{b.residual_pct_notional:.2%} номинала · {b.residual_bp_pa:,.0f} б.п. годовых".replace(",", " ")
+                           if math.isfinite(b.residual_bp_pa) else ""), False))
         else:
             tiles.append(("Наценка сверх обоснованного", "нет", "по mid-оценке структура выгодна компании", False))
     if v.xva is not None:
@@ -274,6 +277,8 @@ def render_html(v) -> str:
                 zl.append('<span><span class="zk" style="background:var(--zone-crit)"></span>● хуже, чем без хеджа</span>')
             if "protection_off" in kinds:
                 zl.append('<span><span class="zk" style="background:var(--zone-warn)"></span>▲ защита отключается</span>')
+            if "corridor" in kinds:
+                zl.append('<span><span class="zk" style="background:var(--zone-info)"></span>○ коридор без защиты (по конструкции)</span>')
             if zl:
                 body += '<div class="zones">' + "".join(zl) + "</div>"
             body += "<ul>" + "".join(f"<li>{esc(s)}</li>" for s in pr.summary) + "</ul>"
@@ -354,7 +359,8 @@ def render_html(v) -> str:
         x = v.xva
         rows = [["CVA (дефолт компании, базовый)", x.cva], ["CVA с WWR: альфа-множитель", x.cva_wwr_alpha],
                 ["CVA с WWR: стохастическая интенсивность", x.cva_wwr_stochastic], ["DVA (дефолт банка)", x.dva],
-                ["FCA / FBA", f"{fmt_num(x.fca)} / {fmt_num(x.fba)}"], ["KVA", x.kva], ["EPE", x.epe], ["Эффективная EPE (1 год)", x.eepe]]
+                ["FCA / FBA", f"{fmt_num(x.fca)} / {fmt_num(x.fba)}"], ["ColVA / MVA", f"{fmt_num(x.colva)} / {fmt_num(x.mva)}"],
+                ["KVA", x.kva], ["EPE", x.epe], ["Эффективная EPE (1 год)", x.eepe]]
         cc = x.method.get("credit_client", {})
         cb = x.method.get("credit_bank", {})
         def _crow(side, c):
@@ -364,7 +370,7 @@ def render_html(v) -> str:
         body = _table(["Показатель", "₽"], rows)
         body += "<h3>Кредитные кривые (прокси)</h3>" + _table(["Сторона", "Лицо", "Метод", "Приоритет метода", "Спред 5Y, б.п.", "PD 1Y", "Восстановление"], crow)
         body += line_chart(x.times, [{"label": "EE (ожидаемая экспозиция банка)", "y": x.ee},
-                                     {"label": f"PFE (квантиль)", "y": x.pfe}, {"label": "ENE (экспозиция компании на банк)", "y": x.ene}],
+                                     {"label": "PFE (квантиль)", "y": x.pfe}, {"label": "ENE (экспозиция компании на банк)", "y": x.ene}],
                            cid="exposure", x_label="лет от даты оценки", y_label="экспозиция, ₽")
         body += (f'<p class="muted">Экспозиция: {esc(x.method.get("exposure"))}; путей {x.method.get("paths")}, seed {x.method.get("seed")}; '
                  f'факторы: {esc(", ".join(x.method.get("risk_factors", [])))}. Неттинг: {esc(x.netting)}; обеспечение: {esc(x.collateral)}. '
@@ -421,7 +427,8 @@ def render_html(v) -> str:
     mp = mk.get("meeting_path")
     if mp:
         xs = list(range(len(mp)))
-        body += "<h3>Имплицированная траектория ключевой ставки по заседаниям</h3>"
+        body += ("<h3>Имплицированная траектория ключевой ставки по заседаниям</h3><p class=\"muted\">Модель двух соседних исходов "
+                 "с шагом 50 б.п.; срочная премия и выпуклость не выделяются; надёжность снижается за последним коротким инструментом.</p>")
         body += _table(["Объявление", "Вступление в силу", "Ставка до", "Ставка после", "Ожидаемое изменение, б.п.", "Исходы (б.п.: вероятность)"],
                        [[m["announcement"], m["effective"], f"{m['rate_before']:.2%}", f"{m['rate_after']:.2%}", m["expected_change_bp"],
                          ", ".join(f"{o['change_bp']:+.0f}: {o['probability']:.0%}" for o in m["outcomes"])] for m in mp])
@@ -464,8 +471,8 @@ def render_html(v) -> str:
                               _table(["Поле", "Значение"], [[k, vv] for k, vv in v.nrd.items()]), open_=False))
     # 14. аудит
     rec = v.record
-    body = (f"<p>Оценка воспроизводится командой <code>prism replay &lt;запись.json&gt;</code>: снапшот загружается по идентификатору "
-            f"с проверкой хэша, сделка — с проверкой хэша, все движки получают те же seed; результаты сравниваются побитово.</p>"
+    body = ("<p>Оценка воспроизводится командой <code>prism replay &lt;запись.json&gt;</code>: снапшот загружается по идентификатору "
+            "с проверкой хэша, сделка — с проверкой хэша, все движки получают те же seed; результаты сравниваются побитово.</p>"
             + _table(["Элемент", "Значение"], [
                 ["Версия пакета", rec.get("code", {}).get("package_version")], ["Git commit", rec.get("code", {}).get("commit")],
                 ["Хэш исходного кода", rec.get("code", {}).get("source_hash")], ["Снапшот", rec.get("snapshot", {}).get("id")],

@@ -13,7 +13,7 @@ meta:
     years: {type: int, default: 3}
 trade: |
   identification: {trade_id: "{{ trade_id }}", client: "{{ client }}", bank: BANK_DEMO, trade_date: "2026-10-15"}
-  product: "Кредит КС+{{ (margin*100)|round(2) }}% с флором {{ floor }}"
+  product: "Кредит КС+{{ (margin*100)|round(2) }}% с флором КС {{ (floor*100)|round(2) }}%"
   purpose: {type: funding}
   underlyings: {KS: {asset_class: rate, id: KEYRATE}}
   legs:

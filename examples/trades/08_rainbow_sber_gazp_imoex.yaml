@@ -1,0 +1,16 @@
+# Rainbow-колл на три бумаги: выплата по взвешенным по рангу доходностям (50/30/20 — лучшей, средней,
+# худшей). Корреляционная матрица проверяется на положительную определённость (Higham при необходимости).
+identification: {trade_id: RB-1, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Rainbow SBER/GAZP/IMOEX 50/30/20 по рангу"
+underlyings:
+  A: {asset_class: equity, id: SBER}
+  B: {asset_class: equity, id: GAZP}
+  C: {asset_class: equity, id: IMOEX}
+model: {paths: 8000}
+legs:
+  - name: opt
+    observable: {type: basket, names: [A, B, C], rule: rainbow, rank_weights: [0.5, 0.3, 0.2], performance: true}
+    currency: RUB
+    schedule: {start: "2026-10-15", dates: ["2027-10-15"], calendar: RU}
+    notional: {currency: RUB, amount: 100000000}
+    components: [{kind: call, strike: 1.0}]

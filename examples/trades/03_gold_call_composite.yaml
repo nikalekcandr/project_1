@@ -1,0 +1,14 @@
+# Тот же колл, что в 02_gold_call_quanto.yaml, но composite: выплата в USD
+# пересчитывается в рубли по курсу ЦБ на дату расчёта (курс не фиксирован).
+identification: {trade_id: CMP-GOLD-01, client: CLIENT_ENERGY, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Composite-колл на золото 3 700 USD, расчёт в RUB по текущему курсу"
+purpose: {type: investment}
+underlyings: {G: {asset_class: commodity, id: GOLD, unit: troy_oz, price_source: LBMA}}
+legs:
+  - name: option
+    underlying: G
+    currency: USD
+    schedule: {dates: ["2027-06-15"], calendar: WEEKENDS}
+    notional: {currency: USD, amount: 10000}
+    settlement: {type: cash, currency: RUB, quanto: {type: composite, pair: USDRUB, fixing_source: CBR}}
+    components: [{kind: call, strike: 3700}]

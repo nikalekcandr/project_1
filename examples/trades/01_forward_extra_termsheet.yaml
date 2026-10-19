@@ -1,0 +1,52 @@
+# Forward extra импортёра, заведённый из термшита: каждое ключевое поле хранит
+# ссылку на пункт документа ({value, ref}), сделка связана с кредитным договором,
+# указаны генеральное соглашение (НФА) и UTI репозитария НРД.
+#   prism price examples/trades/01_forward_extra_termsheet.yaml --report out/extra.html
+schema_version: "1.1"
+identification:
+  trade_id: FXE-2026-0457
+  client: CLIENT_IMPORT
+  bank: BANK_DEMO
+  trade_date: "2026-10-15"
+  termsheet: "Термшит № 457 от 12.10.2026"
+  confirmation: "Подтверждение № 457/К"
+  uti: "RU-NRD-2026-000457"
+  master_agreement: {type: RU_NFA, version: "2011", registered_in_repository: true}
+  netting_set: NS-CLIENT_IMPORT-1
+product: "Forward extra USDRUB: защита 88.10, барьер 78.00"
+purpose:
+  type: buy_fx
+  exposure_notional: 6000000
+  budget_rate: 90.0
+  description: "оплата импортных контрактов в USD, 1 млн ежемесячно"
+underlyings:
+  X:
+    asset_class: fx
+    id: USDRUB
+    fixing: {source: {value: CBR, ref: "п. 5.2 «Курс фиксации — официальный курс ЦБ»"}, lag_days: -1}
+legs:
+  - name: strip
+    underlying: X
+    schedule:
+      start: "2026-10-16"
+      end: {value: "2027-04-16", ref: "п. 2.3 «Срок действия»"}
+      frequency: 1M
+      calendar: RU
+      payment_lag: {value: 1, ref: "п. 5.4 «Дата расчётов: следующий рабочий день»"}
+    notional: {currency: USD, amount: {value: 1000000, ref: "п. 2.1 «Номинал на дату фиксинга»"}}
+    components:
+      - {kind: call, strike: {value: 88.10, ref: "п. 3.1 «Курс защиты»"}, position: long, label: "защита"}
+      - kind: put
+        strike: 88.10
+        position: short
+        label: "обязательство купить по 88.10 после касания барьера"
+        modifiers:
+          - type: barrier
+            kind: in
+            direction: down
+            level: {value: 78.0, ref: "п. 3.2 «Барьер»"}
+            monitoring: {value: discrete, ref: "п. 3.3 «Наблюдение: ежедневно по курсу ЦБ»"}
+            observation: daily
+linked_trades:
+  - {trade_id: "KD-2026-1180", relation: condition_precedent, description: "кредитный договор: хедж — отлагательное условие выдачи"}
+collateral: {regime: none}

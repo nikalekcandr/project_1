@@ -19,8 +19,7 @@ import numpy as np
 from ...core.calendars import get_calendar
 from ...core.dates import Tenor
 from ...core.provenance import DataKind, Provenance, UsedInput
-from ...instruments.schema import (AccrualMod, AutocallMod, BarrierMod, EarlyTerminationMod, ExerciseMod, RateObs,
-                                   StrikeResetMod, Trade)
+from ...instruments.schema import AccrualMod, AutocallMod, BarrierMod, EarlyTerminationMod, ExerciseMod, RateObs, Trade
 from ...payoff.compile import CPeriod, CProduct, compile_trade, observable_names
 from ...payoff.evaluate import Evaluator, MarketView
 from .paths import AssetProcess, HWProcess, PathSet, Simulator
@@ -439,10 +438,16 @@ class MCEngine:
         # квантованные/композитные курсы должны моделироваться
         for leg in cp.legs:
             q = leg.settlement.quanto if leg.settlement else None
-            if q is not None and q.type == "composite" and not any(i.asset_id == q.pair for i in infos.values()):
-                from ...instruments.schema import UnderlyingSpec, FixingSpec
-                spec = UnderlyingSpec(asset_class="fx", id=q.pair, fixing=FixingSpec(source=q.fixing_source))
-                infos[f"__fx_{q.pair}"] = _Info(f"__fx_{q.pair}", spec, ctx, ref)
+            pairs = []
+            if q is not None and q.type == "composite":
+                pairs.append((q.pair, q.fixing_source))
+            if leg.spec.notional_reset:
+                pairs.append((leg.spec.reset_pair, (leg.settlement.fixing_source if leg.settlement else None) or "CBR"))
+            for pair, src in pairs:
+                if not any(i.asset_id == pair for i in infos.values()):
+                    from ...instruments.schema import UnderlyingSpec, FixingSpec
+                    spec = UnderlyingSpec(asset_class="fx", id=pair, fixing=FixingSpec(source=src))
+                    infos[f"__fx_{pair}"] = _Info(f"__fx_{pair}", spec, ctx, ref)
         dates, continuous, names = self._required_dates(cp, infos)
         t_max = max(_t(ref, d) for d in dates) if dates else 0.0
         t_max = max(t_max, 1 / 365)
@@ -485,7 +490,7 @@ class MCEngine:
                 rates.append(hwp)
         k = len(processes) + len(rates)
         corr = np.eye(k)
-        ids = [infos[p.name].asset_id for p in processes] + [f"KEYRATE" if h.name.endswith("RUB") else h.name for h in rates]
+        ids = [infos[p.name].asset_id for p in processes] + ["KEYRATE" if h.name.endswith("RUB") else h.name for h in rates]
         for i in range(k):
             for j in range(i + 1, k):
                 try:

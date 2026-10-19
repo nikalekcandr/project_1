@@ -35,6 +35,7 @@ class GreekConfig:
     rate_gamma_bump: float = 0.0010
     corr_bump: float = 0.05
     vega_buckets: bool = True
+    second_order: bool = True         # ванна, волга, кросс-гамма, корреляции
     key_rates: bool = True
     pv01_quotes: bool = False         # PV01 по калибровочным котировкам (пересборка кривых)
     theta_days: int = 1
@@ -128,6 +129,16 @@ class GreeksCalculator:
             gamma = (up - 2 * base + dn) / dS ** 2
             g = {"spot": S, "delta": delta, "delta_value": delta * S, "gamma": gamma,
                  "gamma_pnl_1pct": 0.5 * gamma * (0.01 * S) ** 2, "method": meth}
+            # гамма в середине оставшегося срока (для оценки издержек динамического хеджирования)
+            half = max((self.trade.maturity - self.ctx.ref_date).days // 2, 1)
+            try:
+                mid = self.ctx.rolled(half)
+                bm = self._v(mid)
+                um = self._v(mid.with_shocks([Shock(kind, aid, h, "relative")]))
+                dm = self._v(mid.with_shocks([Shock(kind, aid, -h, "relative")]))
+                g["gamma_midlife"] = (um - 2 * bm + dm) / dS ** 2
+            except Exception:
+                g["gamma_midlife"] = None
             if kind == "fx":
                 fx = self.ctx.fx(aid)
                 T = (self.trade.maturity - self.ctx.ref_date).days / 365.0
@@ -139,11 +150,12 @@ class GreeksCalculator:
             vd = self.shocked(Shock("vol", aid, -vb))
             g["vega_1pt"] = (vu - vd) / 2
             g["volga_1pt"] = (vu - 2 * base + vd)
-            uu = self.shocked(Shock(kind, aid, h, "relative"), Shock("vol", aid, vb))
-            ud = self.shocked(Shock(kind, aid, h, "relative"), Shock("vol", aid, -vb))
-            du = self.shocked(Shock(kind, aid, -h, "relative"), Shock("vol", aid, vb))
-            dd = self.shocked(Shock(kind, aid, -h, "relative"), Shock("vol", aid, -vb))
-            g["vanna_1pt"] = (uu - ud - du + dd) / (4 * dS) * S * 0.01   # Δвега на 1% спота
+            if self.cfg.second_order:
+                uu = self.shocked(Shock(kind, aid, h, "relative"), Shock("vol", aid, vb))
+                ud = self.shocked(Shock(kind, aid, h, "relative"), Shock("vol", aid, -vb))
+                du = self.shocked(Shock(kind, aid, -h, "relative"), Shock("vol", aid, vb))
+                dd = self.shocked(Shock(kind, aid, -h, "relative"), Shock("vol", aid, -vb))
+                g["vanna_1pt"] = (uu - ud - du + dd) / (4 * dS) * S * 0.01   # Δвега на 1% спота
             if kind == "fx":
                 # ро иностранной валюты: +1 б.п. к ставке базовой валюты (через форвардные пункты)
                 fu = self.shocked(Shock("fx_carry", aid, self.cfg.rate_bump))
@@ -163,7 +175,7 @@ class GreeksCalculator:
             out.values[aid] = g
         # корреляции и кросс-гамма для многоактивных структур
         assets = [(n, s) for n, s in self.trade.underlyings.items() if s.asset_class in ("fx", "equity", "commodity")]
-        if len(assets) >= 2:
+        if len(assets) >= 2 and self.cfg.second_order:
             (n1, s1), (n2, s2) = assets[:2]
             try:
                 cu = self.shocked(Shock("corr", f"{s1.id}|{s2.id}", self.cfg.corr_bump))

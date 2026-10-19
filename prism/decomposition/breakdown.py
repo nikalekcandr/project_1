@@ -42,9 +42,14 @@ class Breakdown:
 
     @property
     def residual_bp_pa(self) -> float:
+        """Остаток в б.п. годовых на номинал-годы (для стрипа — сумма номиналов × срок до каждой выплаты)."""
         if self.notional_ref <= 0 or self.tenor_years <= 0:
             return float("nan")
         return self.residual / self.notional_ref / self.tenor_years * 1e4
+
+    @property
+    def residual_pct_notional(self) -> float:
+        return self.residual / self.notional_ref if self.notional_ref > 0 else float("nan")
 
     def waterfall(self) -> list[dict[str, Any]]:
         return [
@@ -60,11 +65,12 @@ class Breakdown:
         d = asdict(self)
         d["waterfall"] = self.waterfall()
         d["residual_bp_pa"] = self.residual_bp_pa
+        d["residual_pct_notional"] = self.residual_pct_notional
         return d
 
 
 def hedge_cost(trade: Trade, ctx, greeks: dict[str, Any], price_items: list[dict] | None = None,
-               rebalance_days: int = 5) -> tuple[float, list[dict[str, Any]]]:
+               rebalance_days: int = 7) -> tuple[float, list[dict[str, Any]]]:
     """Оценка издержек исполнения и хеджирования (в валюте отчёта).
 
     * дельта: |Δ|·S·(полуспред спота) + |Δ_fwd|·(полуспред форвардных пунктов);
@@ -103,12 +109,16 @@ def hedge_cost(trade: Trade, ctx, greeks: dict[str, Any], price_items: list[dict
             det.append({"item": f"вега {spec.id}", "value": c_vega, "basis": f"Σ|вега по срокам|={vega_abs:,.0f} на 1 п., полуспред {vhs * 100:.2f} п."})
             total += c_vega
             sig = surf.atm_vol(T)
-            gamma = abs(g.get("gamma", 0.0))
+            g0 = abs(g.get("gamma", 0.0))
+            gm = g.get("gamma_midlife")
+            # средняя |Γ| по сроку: трапеция по текущей гамме, гамме в середине срока и нулю на экспирации
+            gamma = (0.25 * g0 + 0.5 * abs(gm) + 0.25 * 0.0) if gm is not None else 0.5 * g0
             dt = rebalance_days / 365.0
             # Σ по ребалансировкам: полуспред × |ΔΔ|·S, E|dS| = S·σ·√dt·√(2/π), число ребалансировок T/dt
             c_dyn = (hs / S) * S * S * gamma * sig * np.sqrt(2 / np.pi) * T / np.sqrt(dt)
-            det.append({"item": f"динамическое перехеджирование {spec.id}", "value": c_dyn,
-                        "basis": f"оценка типа Лиланда, ребалансировка раз в {rebalance_days} дн., Γ={gamma:.3g}"})
+            det.append({"item": f"динамическое перехеджирование {spec.id} (оценка)", "value": c_dyn,
+                        "basis": f"Лиланд: ребалансировка раз в {rebalance_days} дн., средняя по сроку |Γ|={gamma:.3g}, "
+                                 f"полуспред спота {hs:.4f}; допущение изолированного хеджирования"})
             total += c_dyn
         elif spec.asset_class in ("equity", "commodity"):
             hs = 0.0005 * S
@@ -176,14 +186,23 @@ def decompose(trade: Trade, ctx, fair_value: float, greeks: dict[str, Any], xva=
         credit = max(credit, 0.0)
         cdet = {"cva": xva.cva, "cva_wwr_stochastic": xva.cva_wwr_stochastic, "cva_wwr_alpha": xva.cva_wwr_alpha,
                 "dva": xva.dva, "method": xva.method.get("credit_client", {}).get("method")}
-        funding = max(xva.fca - xva.fba, 0.0)
+        funding = max(xva.fca - xva.fba, 0.0) + xva.colva + xva.mva
         capital = xva.kva
     residual = transfer - hc - model_res - credit - funding - capital
-    leg = max(trade.legs, key=lambda l: len(l.components))
-    notional = leg.notional.amount if leg.notional else 0.0
-    if leg.notional and leg.notional.currency != rep:
-        notional *= ctx.fx(f"{leg.notional.currency}{rep}").spot_value
-    T = max((trade.maturity - ctx.ref_date).days / 365.0, 1e-6)
+    # номинал-годы по живым периодам основной ноги: база для «б.п. годовых» у стрипов и амортизации
+    from ..payoff.compile import compile_trade
+    cp = compile_trade(trade, ctx.ref_date)
+    main = max(cp.legs, key=lambda l: len(l.components))
+    conv = 1.0
+    if main.spec.notional and main.spec.notional.currency != rep:
+        conv = ctx.fx(f"{main.spec.notional.currency}{rep}").spot_value
+    live = [p for p in main.periods if p.payment > ctx.ref_date]
+    notional = sum(p.notional for p in live) * conv if not main.is_rate else (max((p.notional for p in live), default=0.0) * conv)
+    if main.is_rate:
+        nyears = sum(p.notional * p.tau for p in live) * conv
+    else:
+        nyears = sum(p.notional * max((p.payment - ctx.ref_date).days / 365.0, 1 / 365) for p in live) * conv
+    T = max(nyears / max(notional, 1e-12), 1e-6)
     notes = []
     if transfer < 0:
         notes.append("Передача стоимости отрицательна: по mid-оценке структура выгодна клиенту")

@@ -17,7 +17,10 @@ CVA — обязательный модуль первой очереди: он 
 * wrong-way risk: альфа-множитель (минимум) и стохастическая интенсивность
   дефолта, коррелированная с рыночным фактором (целевой подход);
 * вторая очередь: FVA (FCA/FBA), KVA (упрощённый SA-CCR-подобный капитал),
-  ColVA/MVA — с явной пометкой допущений.
+  ColVA — разница между ставкой начисления на обеспечение (по CSA) и
+  ставкой дисконтирования на ожидаемом остатке обеспечения; MVA — стоимость
+  фондирования начальной маржи, вносимой банком (для внебиржевых сделок с
+  корпоратами в РФ регуляторной IM нет — обычно ноль). Допущения помечены.
 """
 from __future__ import annotations
 
@@ -27,7 +30,7 @@ from typing import Any
 
 import numpy as np
 
-from ..core.provenance import DataKind, InputTracker, Provenance, UsedInput
+from ..core.provenance import DataKind, Provenance, UsedInput
 from ..instruments.schema import BarrierMod, TargetMod, Trade
 from ..models.mc.engine import MCConfig, MCEngine, MCMarketView, _Info, calibrate_hw
 from ..models.mc.paths import Simulator
@@ -72,6 +75,8 @@ class XVAResult:
     netting: str
     collateral: str
     warnings: list[str] = field(default_factory=list)
+    colva: float = 0.0
+    mva: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         from dataclasses import asdict
@@ -198,7 +203,6 @@ def compute_xva(trades: list[Trade], ctx, cfg: XVAConfig | None = None) -> XVARe
         for f in flows:
             if f.hit_dist is not None:
                 v = sum((h * ev._to_report(f.ccy, d, f) for d, h in f.hit_dist), np.zeros(n))
-                pay_t = np.full(n, (f.payment - ref).days / 365.0)
             else:
                 v = f.amount * ev._to_report(f.ccy, f.payment, f)
             pv_f.append(np.broadcast_to(v, (n,)).astype(float))
@@ -252,7 +256,6 @@ def compute_xva(trades: list[Trade], ctx, cfg: XVAConfig | None = None) -> XVARe
         vb_ns = vb
     # обеспечение с лагом MPoR
     lag = timedelta(days=int(coll.mpor_days * 1.4))
-    expo_idx = [i for i, d in enumerate(grid_dates) if d == ref or (d - lag) in grid_dates or d >= mat or True]
     main_dates = sorted(set(_exposure_grid(ref, mat, cfg.grid_months, 0)))
     main_idx = [grid_dates.index(d) for d in main_dates if d in grid_dates]
 
@@ -269,7 +272,7 @@ def compute_xva(trades: list[Trade], ctx, cfg: XVAConfig | None = None) -> XVARe
             c = c_from_client - c_from_bank
         return np.where(np.abs(c) < coll.mta, 0.0, c) + coll.independent_amount
 
-    EE, ENE, PFE = [], [], []
+    EE, ENE, PFE, EC = [], [], [], []
     E_paths, N_paths = [], []
     for gi in main_idx:
         d = grid_dates[gi]
@@ -277,11 +280,14 @@ def compute_xva(trades: list[Trade], ctx, cfg: XVAConfig | None = None) -> XVARe
         li = max((i for i, x in enumerate(grid_dates) if x <= lag_d), default=0) if d > ref else gi
         e_tot = np.zeros(n)
         ne_tot = np.zeros(n)
+        c_tot = np.zeros(n)
         for s in range(vb_ns.shape[0]):
             v = vb_ns[s, :, gi]
             c = collateral(vb_ns[s, :, li]) if d > ref else np.zeros(n)
+            c_tot += c
             e_tot += np.maximum(v - c, 0.0)
             ne_tot += np.maximum(-(v - c), 0.0)
+        EC.append(float(c_tot.mean()))
         E_paths.append(e_tot)
         N_paths.append(ne_tot)
         EE.append(float(e_tot.mean()))
@@ -344,6 +350,18 @@ def compute_xva(trades: list[Trade], ctx, cfg: XVAConfig | None = None) -> XVARe
     unc = coll.regime == "none"
     fca = float(cfg.funding_spread * np.sum(0.5 * (ee_d[1:] + ee_d[:-1]) * dt)) if unc else 0.0
     fba = float(cfg.funding_spread * np.sum(0.5 * (ene_d[1:] + ene_d[:-1]) * dt)) if unc else 0.0
+    # ColVA: обеспечение клиента (C > 0) банк держит и платит по нему ставку CSA, размещая по ставке дисконтирования
+    colva = 0.0
+    if coll.regime != "none" and coll.rate_index:
+        try:
+            cc = ctx.forecast_curve(coll.rate_index, "ColVA: ставка начисления на обеспечение")
+            tm_mid = 0.5 * (mt[1:] + mt[:-1])
+            spread = np.asarray(cc.inst_fwd(tm_mid), float) - np.asarray(disc.inst_fwd(tm_mid), float)
+            ec_d = np.array(EC) * dfs
+            colva = float(np.sum(spread * 0.5 * (ec_d[1:] + ec_d[:-1]) * dt))
+        except Exception as e:   # не подставляем ноль молча
+            warnings.append(f"ColVA не рассчитан: {type(e).__name__}: {e}")
+    mva = 0.0   # банк не вносит начальную маржу по сделке с корпоратом (нет регуляторной IM): допущение в отчёте
     ead = cfg.wwr_alpha * eee
     capital = ead * cfg.risk_weight * cfg.capital_ratio
     kva = float(cfg.cost_of_capital * np.sum(0.5 * (capital[1:] * dfs[1:] + capital[:-1] * dfs[:-1]) * dt))
@@ -359,8 +377,10 @@ def compute_xva(trades: list[Trade], ctx, cfg: XVAConfig | None = None) -> XVARe
         "vol_model": "Блэк с временной структурой ATM",
         "credit_client": hc.describe(), "credit_bank": hb.describe(),
         "wwr": {"alpha": cfg.wwr_alpha, "beta": beta, "driver": driver},
+        "colva": f"ставка обеспечения {coll.rate_index} против дисконтирования" if coll.regime != "none" else "без CSA — не применяется",
+        "mva": "0: банк не вносит начальную маржу (нет регуляторной IM для внебиржевых сделок с корпоратами)",
     }
     return XVAResult(mt.tolist(), [grid_dates[i].isoformat() for i in main_idx], EE, ENE, PFE, epe, eepe, cva, dva,
                      cfg.wwr_alpha * cva, cva_stoch, fca, fba, kva, method, v0s,
                      "неттинг по генсоглашению" if netting_ok else "брутто (неттинг неприменим)",
-                     coll.regime, warnings)
+                     coll.regime, warnings, colva, mva)

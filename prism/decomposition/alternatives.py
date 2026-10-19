@@ -10,13 +10,11 @@
 """
 from __future__ import annotations
 
-from datetime import date
 from typing import Any
 
-import numpy as np
 from scipy.optimize import brentq
 
-from ..instruments.schema import Component, Leg, RateObs, Trade
+from ..instruments.schema import Leg, Trade
 from ..pricing.engine import price_trade
 
 
@@ -98,7 +96,6 @@ def generate_alternatives(trade: Trade, ctx) -> list[dict[str, Any]]:
         base_fwd = _with_components(trade, leg, [{"kind": "forward", "strike": 0.0, "position": "long" if buy else "short"}],
                                     "форвард")
         f0 = price_trade(base_fwd, ctx).value
-        n_units = _units(leg)
         dfw = _annuity_units(trade, leg, ctx)
         Fm = abs(f0) / dfw if dfw > 0 else 0.0
         fwd = _with_components(trade, leg, [{"kind": "forward", "strike": Fm, "position": "long" if buy else "short"}],
@@ -160,10 +157,6 @@ def generate_alternatives(trade: Trade, ctx) -> list[dict[str, Any]]:
         a["value"] = r.value
         a["engine"] = r.engine
     return out
-
-
-def _units(leg: Leg) -> float:
-    return leg.notional.amount if leg.notional else 1.0
 
 
 def _annuity_units(trade: Trade, leg: Leg, ctx) -> float:

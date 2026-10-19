@@ -1,0 +1,17 @@
+# Best-of колл на две акции с ограничением участия (колл-спред): корзина с
+# правилом выбора best_of и нормировкой на начальные уровни. Чувствительность к
+# корреляции SBER–GAZP выше, чем к волатильности — см. блок «корреляция» в греках.
+identification: {trade_id: BO-EQ-01, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Best-of колл SBER/GAZP, участие ограничено +40%"
+purpose: {type: investment}
+underlyings:
+  A: {asset_class: equity, id: SBER, fixing: {source: MOEX}}
+  B: {asset_class: equity, id: GAZP, fixing: {source: MOEX}}
+model: {paths: 30000}
+legs:
+  - name: option
+    observable: {type: basket, names: [A, B], rule: best_of, performance: true}
+    currency: RUB
+    schedule: {start: "2026-10-15", dates: ["2027-10-15"], calendar: RU, payment_lag: 2}
+    notional: {currency: RUB, amount: 100000000}
+    components: [{kind: call, strike: 1.0, cap_strike: 1.4}]

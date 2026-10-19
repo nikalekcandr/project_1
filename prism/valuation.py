@@ -7,7 +7,7 @@ XVA) → разложение → отчёт.
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -32,11 +32,12 @@ class ValuationOptions:
     market_rate_at_inception: float | None = None
     xva_paths: int = 4000
     greek_mc_paths: int | None = 20000
+    greeks_full: bool = True
     engine: str | None = None
 
     @classmethod
     def fast(cls) -> "ValuationOptions":
-        return cls(grid=False, barrier_profile=False, xva_paths=2000, greek_mc_paths=8000)
+        return cls(grid=False, barrier_profile=False, crosscheck=False, xva_paths=2000, greek_mc_paths=6000, greeks_full=False)
 
     @classmethod
     def price_only(cls) -> "ValuationOptions":
@@ -124,7 +125,8 @@ def run_valuation(trade: Trade, snapshot: MarketSnapshot, options: ValuationOpti
     base = v.pricing.value
     eng = opt.engine
     if opt.greeks:
-        v.greeks = _step(v, "greeks", lambda: compute_greeks(trade, ctx, GreekConfig(mc_paths=opt.greek_mc_paths), engine=eng))
+        gcfg = GreekConfig(mc_paths=opt.greek_mc_paths, vega_buckets=opt.greeks_full, second_order=opt.greeks_full)
+        v.greeks = _step(v, "greeks", lambda: compute_greeks(trade, ctx, gcfg, engine=eng))
     mc_o = {"paths": opt.greek_mc_paths} if opt.greek_mc_paths else None
     if opt.stresses:
         v.stresses = _step(v, "stresses", lambda: run_stresses(trade, ctx, base, eng, mc_o))
@@ -138,30 +140,25 @@ def run_valuation(trade: Trade, snapshot: MarketSnapshot, options: ValuationOpti
         v.alternatives = _step(v, "alternatives", lambda: generate_alternatives(trade, ctx))
     if opt.profile and v.alternatives is not None and purpose in ("buy_fx", "sell_fx", "buy_commodity", "sell_commodity", "pay_floating"):
         def prof():
-            pt = protection_terms(trade, purpose)
-            leg = pt["leg"]
-            n_per = leg.notional.amount if leg.notional else 1.0
-            n_periods = len(leg.schedule.dates) if leg.schedule.dates else max(1, len([1 for _ in range(1)]))
+            import numpy as np
             from .payoff.compile import compile_trade
+            leg = protection_terms(trade, purpose)["leg"]
             cp = compile_trade(trade, ctx.ref_date)
             main = max(cp.legs, key=lambda l: len(l.components))
             live = [p for p in main.periods if p.payment > ctx.ref_date]
             if purpose == "pay_floating":
                 exposure = sum(p.notional * p.tau for p in live)
                 center = float(ctx.forecast_curve(trade.underlyings[leg.underlying].id if leg.underlying else "KEYRATE").zero(1.0))
-                center = 365 * __import__("numpy").expm1(center / 365)
+                center = 365 * np.expm1(center / 365)
                 xl = "средняя ставка за период"
             else:
                 exposure = trade.purpose.exposure_notional or sum(p.notional for p in live)
                 u = trade.underlyings[leg.underlying] if leg.underlying else next(iter(trade.underlyings.values()))
                 center = ctx.fx(u.id).spot_value if u.asset_class == "fx" else ctx.commodity(u.id).forward(trade.maturity)
                 xl = "курс на даты фиксинга" if u.asset_class == "fx" else "цена на даты фиксинга"
-            upfront = {}
-            for a in v.alternatives:
-                if a["value"] > 0 and abs(a["value"]) > 1e-6:
-                    from .marketdata.context import MarketContext as _MC
-                    disc = ctx.discount_curve(trade.report_currency)
-                    upfront[a["label"]] = a["value"] / disc.df_date(trade.maturity)
+            # премия опционных альтернатив — с наращением на дату погашения (в профиле сопоставима с выплатами)
+            disc = ctx.discount_curve(trade.report_currency)
+            upfront = {a["label"]: a["value"] / disc.df_date(trade.maturity) for a in v.alternatives if a["value"] > 1e-6}
             prem = trade.premium.amount if trade.premium and trade.premium.payer == "client" else 0.0
             if prem:
                 upfront["Предложенная структура"] = prem

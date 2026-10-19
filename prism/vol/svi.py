@@ -40,6 +40,26 @@ class SVI:
         w1, w2 = self.dw(k), self.d2w(k)
         return (1 - k * w1 / (2 * w)) ** 2 - w1 * w1 / 4 * (1 / w + 0.25) + w2 / 2
 
+    def jac(self, k):
+        """Производные (w, w', w'', g) по параметрам (a, b, ρ, m, σ): массивы [len(k), 5] — для SLSQP без конечных разностей."""
+        k = np.asarray(k, dtype=float)
+        b, rho, sg = self.b, self.rho, self.sigma
+        x = k - self.m
+        R = np.sqrt(x * x + sg * sg)
+        R3, R5 = R ** 3, R ** 5
+        z, one = np.zeros_like(k), np.ones_like(k)
+        w = self.w(k)
+        w1 = self.dw(k)
+        dw = np.column_stack([one, rho * x + R, b * x, -b * (rho + x / R), b * sg / R])
+        dw1 = np.column_stack([z, rho + x / R, b * one, -b * sg * sg / R3, -b * x * sg / R3])
+        dw2 = np.column_stack([z, sg * sg / R3, z, 3 * b * sg * sg * x / R5, b * (2 * sg / R3 - 3 * sg ** 3 / R5)])
+        wc = np.maximum(w, 1e-12)[:, None]
+        A = (1 - k * w1 / (2 * np.maximum(w, 1e-12)))[:, None]
+        dA = -k[:, None] / (2 * wc) * dw1 + (k * w1)[:, None] / (2 * wc * wc) * dw
+        W1 = w1[:, None]
+        dg = 2 * A * dA - (W1 / 2) * (1 / wc + 0.25) * dw1 + (W1 * W1 / 4) / (wc * wc) * dw + 0.5 * dw2
+        return dw, dg
+
     def params(self) -> dict:
         return {"a": self.a, "b": self.b, "rho": self.rho, "m": self.m, "sigma": self.sigma}
 
@@ -109,15 +129,22 @@ def _constrained(k, w, wt, kg, qe: SVI) -> SVI:
 
     def obj(x):
         s_ = mk(x)
-        return float(np.sum(wt * (s_.w(k) - w) ** 2)) * 1e6
+        e = s_.w(k) - w
+        dw, _ = s_.jac(k)
+        return float(np.sum(wt * e * e)) * 1e6, 2e6 * (wt * e) @ dw
 
-    cons = [{"type": "ineq", "fun": lambda x: mk(x).g(kg)},
-            {"type": "ineq", "fun": lambda x: x[0] + x[1] * x[4] * np.sqrt(1 - x[2] ** 2)}]
+    def min_var_jac(x):
+        q = np.sqrt(max(1 - x[2] ** 2, 1e-12))
+        return np.array([1.0, x[4] * q, -x[1] * x[4] * x[2] / q, 0.0, x[1] * q])
+
+    cons = [{"type": "ineq", "fun": lambda x: mk(x).g(kg), "jac": lambda x: mk(x).jac(kg)[1]},
+            {"type": "ineq", "fun": lambda x: x[0] + x[1] * x[4] * np.sqrt(1 - x[2] ** 2), "jac": min_var_jac}]
     best = None
     for x0 in starts:
         x0 = np.clip(x0, [b[0] for b in bounds], [b[1] for b in bounds])
         try:
-            r = minimize(obj, x0, method="SLSQP", bounds=bounds, constraints=cons, options={"maxiter": 500, "ftol": 1e-14})
+            r = minimize(obj, x0, jac=True, method="SLSQP", bounds=bounds, constraints=cons,
+                         options={"maxiter": 500, "ftol": 1e-14})
         except Exception:  # pragma: no cover
             continue
         s_ = mk(r.x)

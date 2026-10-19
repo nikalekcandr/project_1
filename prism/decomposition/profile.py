@@ -9,8 +9,9 @@
 дериватива и выделяются зоны:
 * «защита не работает» — неблагоприятный для клиента уровень, где
   дериватив не компенсирует движение (например, за KO-барьером);
-* «хуже, чем без хеджа» — уровень, где эффективный курс хуже рыночного
-  (плечо на благоприятном движении).
+* «хуже, чем без хеджа» — уровень, где эффективный курс хуже рыночного;
+  причина определяется по конструкции сделки (плечо, проданный опцион,
+  включающийся при касании барьера, или фиксация курса).
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from ..instruments.schema import RateObs, Trade
+from ..instruments.schema import BarrierMod, LeverageMod, RateObs, Trade
 from ..payoff.compile import CPeriod, CProduct, compile_trade
 from ..payoff.evaluate import Evaluator, MarketView
 
@@ -62,6 +63,8 @@ class ScenarioView(MarketView):
 
     def obs_matrix(self, obs, dates):
         t = obs.type
+        if t == "rate":
+            return self.rate_daily(obs, dates)
         if t == "asset":
             return np.column_stack([self._asset(obs.name, d) for d in dates])
         if t == "performance":
@@ -127,6 +130,22 @@ class ProfileResult:
         return asdict(self)
 
 
+def _worse_reason(trade: Trade) -> tuple[str, str]:
+    """(короткая метка зоны, объяснение) — почему структура хуже позиции без хеджа на благоприятном движении."""
+    comps = [c for leg in trade.legs for c in leg.components]
+    mods = [m for c in comps for m in c.modifiers] + [m for leg in trade.legs for m in leg.modifiers] + list(trade.modifiers)
+    if any(isinstance(m, LeverageMod) and m.factor > 1 for m in mods) or any(c.notional_multiplier > 1 + 1e-12 for c in comps):
+        return "плечо на благоприятном движении", "клиент переплачивает из-за плеча: объём обязательства увеличен"
+    if any(c.position == "short" and any(isinstance(m, BarrierMod) and m.kind == "in" for m in c.modifiers) for c in comps):
+        return "обязательство после касания барьера", ("после касания барьера клиент обязан исполнить проданный опцион "
+                                                       "по курсу защиты, хотя рынок выгоднее")
+    if any(c.position == "short" for c in comps):
+        return "проданный опцион", "выгода от благоприятного движения отдана банку через проданный опцион"
+    if trade.premium is not None and trade.premium.payer == "client" and trade.premium.amount > 0:
+        return "уплаченная премия", "уплаченная премия: защита не понадобилась, а её стоимость уже понесена"
+    return "фиксация уровня", "уровень зафиксирован: выгода от благоприятного движения не достаётся клиенту"
+
+
 def hedge_profile(trade: Trade, alternatives: list[tuple[str, Trade]], ctx, purpose: str, exposure_units: float,
                   center: float, span: float = 0.4, n: int = 161, x_label: str = "курс на дату исполнения",
                   upfront: dict[str, float] | None = None) -> ProfileResult:
@@ -154,11 +173,17 @@ def hedge_profile(trade: Trade, alternatives: list[tuple[str, Trade]], ctx, purp
     summary = []
     # «хуже, чем без хеджа»: эффективный курс хуже рынка
     worse = (eff_s > x + 1e-9 * center) if buyer else (eff_s < x - 1e-9 * center)
+    short_reason, long_reason = _worse_reason(trade)
+    what = "курс" if "fx" in purpose else "уровень"
     for a, b in _intervals(x, worse):
         zones.append({"type": "worse_than_unhedged", "from": a, "to": b,
-                      "label": "хуже, чем без хеджа (плечо на благоприятном движении)"})
-        summary.append(f"При уровне {_fmt(a)}–{_fmt(b)} эффективный {('курс' if 'fx' in purpose else 'уровень')} хуже рыночного: "
-                       f"клиент переплачивает из-за плеча")
+                      "label": f"хуже, чем без хеджа ({short_reason})"})
+        adverse_side = a >= center if buyer else b <= center
+        if adverse_side:   # неблагоприятное движение: защита не действует, а издержки структуры остаются
+            summary.append(f"При уровне {_fmt(a)}–{_fmt(b)} эффективный {what} хуже рыночного: защиты нет, "
+                           f"а издержки структуры остаются ({short_reason})")
+        else:
+            summary.append(f"При уровне {_fmt(a)}–{_fmt(b)} эффективный {what} хуже рыночного: {long_reason}")
     # «защита не работает»: на неблагоприятном движении защита сначала действовала, а затем отключилась
     slope = np.gradient(eff_s, x)
     order = np.arange(len(x)) if buyer else np.arange(len(x))[::-1]
@@ -172,7 +197,17 @@ def hedge_profile(trade: Trade, alternatives: list[tuple[str, Trade]], ctx, purp
             protected_seen = True
         elif protected_seen and abs(slope[i]) > 0.5:
             off[i] = True
+    protected = np.abs(slope) < 0.1
     for a, b in _intervals(x, off):
+        # если дальше по неблагоприятному направлению защита снова включается — это коридор по конструкции
+        # (коллар, participating), а не отключение защиты
+        beyond = (x > b) if buyer else (x < a)
+        if np.any(protected & beyond):
+            zones.append({"type": "corridor", "from": a, "to": b,
+                          "label": "коридор без защиты: уровень следует за рынком до следующего страйка"})
+            summary.append(f"При уровне {_fmt(a)}–{_fmt(b)} — коридор без защиты по конструкции: эффективный уровень "
+                           f"следует за рынком, защита снова действует дальше")
+            continue
         zones.append({"type": "protection_off", "from": a, "to": b,
                       "label": "защита отключается: эффективный уровень следует за рынком"})
         summary.append(f"При уровне {_fmt(a)}–{_fmt(b)} структура перестаёт защищать: эффективный уровень снова "

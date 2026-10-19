@@ -34,6 +34,7 @@ from ..models.analytic.barriers import (bgk_shift, barrier_price, double_barrier
 from ..models.analytic.black import bachelier, black, black_digital
 from ..models.analytic.spread import kirk
 from ..models.analytic.vanna_volga import vanna_volga_price
+from ..models.pde.fd1d import term_structure_adjustment
 from ..models.analytic.variance import replicate_variance
 from ..payoff.compile import CLeg, CPeriod, CProduct
 
@@ -85,6 +86,8 @@ class AnalyticEngine:
         self.ref = cp.ref_date
         res = AnalyticResult(0.0)
         for li, leg in enumerate(cp.legs):
+            if leg.spec.notional_reset:
+                leg = self._reset_leg(leg)
             if isinstance(leg.observable, WeatherObs):
                 return self._weather(trade, cp)
             for p in leg.periods:
@@ -124,12 +127,28 @@ class AnalyticEngine:
         fx = self.ctx.fx(f"{ccy}{rep}", f"пересчёт {ccy} в {rep}")
         return fx.forward(d) * float(disc.df(t))
 
+    def _reset_leg(self, leg: CLeg) -> CLeg:
+        """MtM CCS при детерминированных ставках: номинал периода N₀·F(tᵢ)/X(t₀) — точное ожидание
+        (купон и обмен номиналом линейны по курсу на дату ресета, ставки детерминированы)."""
+        from dataclasses import replace
+        pair = leg.spec.reset_pair
+        src = (leg.settlement.fixing_source if leg.settlement else None) or "CBR"
+        fx = self.ctx.fx(pair, f"MtM-ресет номинала по {pair}")
+
+        def level(d: date) -> float:
+            if d <= self.ref and self.ctx.has_fixing(pair, src, d):
+                return self.ctx.fixing(pair, src, d, f"фиксинг {pair} ({src}) для ресета номинала")
+            if d < self.ref:
+                self.ctx.tracker.warn(f"Нет фиксинга {pair} ({src}) на {d}: ресет номинала по текущему форварду")
+            return fx.forward(max(d, self.ref))
+        x0 = level(leg.periods[0].start)
+        periods = [replace(p, notional=p.notional * level(p.start) / x0) for p in leg.periods]
+        return replace(leg, periods=periods)
+
     def _notional_flows(self, leg: CLeg) -> float:
         ex = leg.spec.exchange_notional
         if ex == "none":
             return 0.0
-        if leg.spec.notional_reset:
-            raise NotAnalytic("MtM-ресет номинала требует Монте-Карло")
         sign = 1.0 if (leg.components and leg.components[0].position == "long") else -1.0
         ps = leg.periods
         v = 0.0
@@ -334,6 +353,17 @@ class AnalyticEngine:
         (kp, ka, kc), (vp, va, vc) = surf.pillars_at(T)
         return rd, rf, (kp, ka, kc), (vp, va, vc)
 
+    def _ts_adj(self, leg: CLeg, S0, F, T, df, surf, payoff, lower=None, upper=None, rebate=0.0) -> float:
+        """Поправка барьерной формулы на временную структуру ставок, сноса и ATM-волатильности (PDE − PDE)."""
+        spec = self.trade.underlyings[leg.observable.name]
+        fwd = self.ctx.asset_forward_fn(spec.id)
+        disc = self.ctx.discount_curve(leg.currency)
+        return term_structure_adjustment(
+            payoff, S0, F, T, df, log_fwd_growth=lambda ts: np.log(np.asarray(fwd(np.asarray(ts)), float)),
+            cum_rate=lambda ts: -np.log(np.asarray(disc.df(np.asarray(ts)), float)),
+            atm_total_var=lambda ts: np.array([surf.atm_vol(float(t)) ** 2 * float(t) for t in ts]),
+            lower=lower, upper=upper, rebate=rebate)
+
     def _barrier_window_ok(self, m: BarrierMod, leg: CLeg, p: CPeriod) -> None:
         ws = m.window_start or (p.start if m.scope == "period" else self.cp.start)
         we = m.window_end or p.fixing
@@ -384,28 +414,38 @@ class AnalyticEngine:
         if H is not None:
             ko = vanna_volga_price(lambda s, v: barrier_price(s, K, H, T, rd, rf, v, cp, m.direction, "out", 0.0), S0, T, rd, rf,
                                    atm, pk, pv, survival=no_touch_prob(S0, H, T, rd, rf, atm, m.direction))
+            bnd = {"upper": H} if m.direction == "up" else {"lower": H}
+            ts_ko = self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.maximum(cp * (x - K), 0.0), **bnd)
             van = float(black(F, K, T, float(surf.vol(K, T)), df, cp))
-            ko_v = ko["price"]
+            ko_v = ko["price"] + ts_ko
             if self._past_knocked(m, self._label):
                 ko_v = 0.0
             reb_v = 0.0
             if reb:
-                ot = touch_price(S0, H, T, rd, rf, atm, m.direction, "in", reb, at_hit)
-                reb_v = ot if m.kind == "out" else touch_price(S0, H, T, rd, rf, atm, m.direction, "out", reb)
+                if m.kind == "out":     # ребейт при выбивании: при касании или в дату экспирации
+                    ot = touch_price(S0, H, T, rd, rf, atm, m.direction, "in", reb, at_hit)
+                    ts_r = (self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.zeros_like(x), rebate=1.0, **bnd) if at_hit
+                            else -self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.ones_like(x), **bnd))
+                    reb_v = ot + reb * ts_r
+                else:                   # ребейт KI, если барьер так и не задет
+                    reb_v = touch_price(S0, H, T, rd, rf, atm, m.direction, "out", reb) \
+                        + reb * self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.ones_like(x), **bnd)
             v = (ko_v if m.kind == "out" else max(van - ko_v, 0.0)) + reb_v
             flat = barrier_price(S0, K, H, T, rd, rf, atm, cp, m.direction, m.kind, reb, at_hit)
             extra = {"forward": F, "barrier_effective": H, "bs_flat_atm": flat, "vv_correction": ko["correction"],
-                     "survival": ko["survival_weight"], "vanilla": van}
-            return v, "Reiner-Rubinstein + vanna-volga" + (f"; {note}" if note else ""), extra
+                     "survival": ko["survival_weight"], "term_structure_adj": ts_ko, "vanilla": van}
+            return v, "Reiner-Rubinstein + vanna-volga + поправка на временную структуру (PDE)" + (f"; {note}" if note else ""), extra
         # двойной барьер
         if L is None or U is None:
             raise NotAnalytic("двойной барьер требует обоих уровней")
         dnt = double_no_touch_prob(S0, L, U, T, rd, rf, atm)
         ko = vanna_volga_price(lambda s, v: double_barrier_ko(s, K, L, U, T, rd, rf, v, cp), S0, T, rd, rf, atm, pk, pv, dnt)
+        ts_ko = self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.maximum(cp * (x - K), 0.0), lower=L, upper=U)
+        ko_v = ko["price"] + ts_ko
         van = float(black(F, K, T, float(surf.vol(K, T)), df, cp))
-        v = ko["price"] if m.kind == "out" else max(van - ko["price"], 0.0)
-        return v, "Ikeda-Kunitomo + vanna-volga" + (f"; {note}" if note else ""), \
-            {"forward": F, "lower": L, "upper": U, "survival": dnt, "vanilla": van}
+        v = ko_v if m.kind == "out" else max(van - ko_v, 0.0)
+        return v, "Ikeda-Kunitomo + vanna-volga + поправка на временную структуру (PDE)" + (f"; {note}" if note else ""), \
+            {"forward": F, "lower": L, "upper": U, "survival": dnt, "term_structure_adj": ts_ko, "vanilla": van}
 
     def _touch(self, c, pay, barriers, leg, p, S0, F, T, surf, df):
         if len(barriers) > 1:
@@ -421,28 +461,37 @@ class AnalyticEngine:
             nt = no_touch_prob(S0, H, T, rd, rf, atm, m.direction)
             fn = lambda s, v: touch_price(s, H, T, rd, rf, v, m.direction, "out", 1.0)
             vv = vanna_volga_price(fn, S0, T, rd, rf, atm, pk, pv, survival=nt)
-            nt_v = vv["price"]
+            bnd = {"upper": H} if m.direction == "up" else {"lower": H}
+            ts_nt = self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.ones_like(x), **bnd)
+            nt_v = vv["price"] + ts_nt
             if m.kind == "out":
                 v = pay * nt_v
                 meth = "no-touch: аналитика + vanna-volga"
             else:
                 if at_hit:
-                    v = pay * (touch_price(S0, H, T, rd, rf, atm, m.direction, "in", 1.0, True)
-                               + (vv["bs_atm"] - nt_v))
+                    ts_hit = self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.zeros_like(x), rebate=1.0, **bnd)
+                    v = pay * (touch_price(S0, H, T, rd, rf, atm, m.direction, "in", 1.0, True) + ts_hit
+                               + (vv["bs_atm"] - vv["price"]))
                 else:
                     v = pay * (df - nt_v)
                 meth = "one-touch: аналитика + vanna-volga"
-            return v, meth + (f"; {note}" if note else ""), {"no_touch_vv": nt_v / max(df, 1e-12), "no_touch_flat": nt}
+            meth += " + поправка на временную структуру (PDE)"
+            return v, meth + (f"; {note}" if note else ""), {"no_touch_vv": nt_v / max(df, 1e-12), "no_touch_flat": nt,
+                                                              "term_structure_adj": ts_nt}
         dnt_flat = double_no_touch(S0, L, U, T, rd, rf, atm, 1.0)
         fn = lambda s, v: double_no_touch(s, L, U, T, rd, rf, v, 1.0)
         vv = vanna_volga_price(fn, S0, T, rd, rf, atm, pk, pv, survival=dnt_flat / df)
-        dnt = vv["price"]
+        ts_dnt = self._ts_adj(leg, S0, F, T, df, surf, lambda x: np.ones_like(x), lower=L, upper=U)
+        dnt = vv["price"] + ts_dnt
         v = pay * dnt if m.kind == "out" else pay * (df - dnt)
-        return v, "double-no-touch (Hui) + vanna-volga", {"dnt_flat": dnt_flat, "dnt_vv": dnt}
+        return v, "double-no-touch (Hui) + vanna-volga + поправка на временную структуру (PDE)", \
+            {"dnt_flat": dnt_flat, "dnt_vv": dnt, "term_structure_adj": ts_dnt}
 
     def _asian(self, leg, p, c, avg, df):
         if c.kind not in ("call", "put", "forward"):
             raise NotAnalytic("азиатская выплата не call/put/forward")
+        if avg.method in ("max", "min"):
+            raise NotAnalytic("lookback (экстремум по наблюдениям) — Монте-Карло")
         if avg.average_of == "strike":
             raise NotAnalytic("усреднение страйка — Монте-Карло")
         spec = self.trade.underlyings[leg.observable.name]
@@ -488,7 +537,6 @@ class AnalyticEngine:
         Fs, vols, ids = [], [], []
         T = max(_t(self.ref, p.fixing), 1e-6)
         for term in terms:
-            spec = self.trade.underlyings[term["name"]]
             sub_leg = CLeg(leg.name, leg.spec, AssetObs(name=term["name"]), [p], leg.currency, leg.settlement, [], [], leg.daycount)
             aid, cls, S0, F, T_, surf, _ = self._asset_ctx(sub_leg, p)
             Fs.append(F * float(term.get("coef", 1.0)))
@@ -633,7 +681,6 @@ class AnalyticEngine:
         self.trade, self.cp, self.ref = trade, cp, cp.ref_date
         ex = m.dates[0]
         T = _t(self.ref, ex)
-        und = AnalyticResult(0.0)
         fixed_ann = 0.0
         fixed_rate = None
         fixed_sign = 0.0
@@ -772,7 +819,6 @@ class AnalyticEngine:
             raise NotAnalytic("модификаторы на вариансном свопе — Монте-Карло")
         if p.start < self.ref:
             raise NotAnalytic("сезонный вариансный своп (наблюдения уже идут) — Монте-Карло")
-        spec = self.trade.underlyings[obs.name]
         sub = CLeg(leg.name, leg.spec, AssetObs(name=obs.name), [p], leg.currency, leg.settlement, [], [], leg.daycount)
         aid, cls, S0, F, T, surf, _ = self._asset_ctx(sub, p)
         surf.register(self.ctx.tracker, T, None, "репликация вариансного свопа")

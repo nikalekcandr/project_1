@@ -1,0 +1,16 @@
+# Year-on-year инфляционный своп: ИПЦ г/г (лаг 3 мес., уточнённая публикация) против 6% —
+# прогнозная кривая ИПЦ с сезонностью и поправкой на выпуклость yoy.
+identification: {trade_id: YOYS-1, client: CLIENT_ENERGY, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "YoY инфляционный своп 3Y: ИПЦ г/г против 6%"
+underlyings: {CPI: {asset_class: inflation, id: RU.CPI}}
+legs:
+  - name: infl
+    underlying: CPI
+    observable: {type: cpi, name: RU.CPI, lag_months: 3, measure: yoy}
+    schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 1Y, calendar: RU}
+    notional: {currency: RUB, amount: 1000000000}
+    components: [{kind: float}]
+  - name: fixed
+    schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 1Y, calendar: RU}
+    notional: {currency: RUB, amount: 1000000000}
+    components: [{kind: fixed, rate: 0.06, position: short}]

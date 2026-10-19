@@ -1,0 +1,25 @@
+# Нефтяной экспортёр: коллар нулевой стоимости на дифференциал Urals − Brent
+# с ежемесячным усреднением и мягким барьером на защите (частичное отключение в
+# полосе 4 долл.) — спред-наблюдаемая + усреднение + soft barrier, всё конфигурацией.
+identification: {trade_id: OIL-DIFF-01, client: CLIENT_ENERGY, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Коллар на дифференциал Urals−Brent, мягкий барьер на защите"
+purpose: {type: sell_commodity, description: "экспортная выручка привязана к Urals, хедж дисконта к Brent"}
+underlyings:
+  U: {asset_class: commodity, id: URALS, unit: bbl}
+  B: {asset_class: commodity, id: BRENT, unit: bbl}
+model: {paths: 20000}
+legs:
+  - name: collar
+    observable: {type: spread, terms: [{name: U, coef: 1.0}, {name: B, coef: -1.0}]}
+    currency: USD
+    schedule: {start: "2026-11-01", end: "2027-05-01", frequency: 1M, calendar: WEEKENDS, payment_lag: 5}
+    notional: {currency: USD, amount: 200000}
+    settlement: {type: cash, currency: RUB, quanto: {type: composite, pair: USDRUB, fixing_source: CBR}}
+    components:
+      - kind: put
+        strike: -14.0
+        label: "защита от расширения дисконта"
+        modifiers:
+          - {type: averaging, method: arithmetic}
+          - {type: barrier, kind: out, direction: down, level: -24.0, soft_width: 4.0, monitoring: discrete, observation: daily}
+      - {kind: call, strike: -9.0, position: short, label: "отдаёт сужение дисконта", modifiers: [{type: averaging}]}

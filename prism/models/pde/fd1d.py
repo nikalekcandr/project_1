@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Callable
 
 import numpy as np
-from scipy.linalg import solve_banded
+from scipy.linalg.lapack import dgtsv
 
 
 def solve_pde(payoff: Callable[[np.ndarray], np.ndarray], S0: float, T: float, *,
@@ -63,7 +63,6 @@ def solve_pde(payoff: Callable[[np.ndarray], np.ndarray], S0: float, T: float, *
     intrinsic = payoff(S)
     if cont:
         V = apply_barrier(V, T)
-    m = len(x) - 2
     for n in range(n_t, 0, -1):
         t1, t0 = ts[n], ts[n - 1]
         dt = t1 - t0
@@ -103,11 +102,10 @@ def solve_pde(payoff: Callable[[np.ndarray], np.ndarray], S0: float, T: float, *
         rhs = Vi + (1 - theta) * dt * LV
         rhs[0] += theta * dt * bl
         rhs[-1] += theta * dt * br
-        ab = np.zeros((3, m))
-        ab[0, 1:] = -theta * dt * C[:-1]
-        ab[1, :] = 1 - theta * dt * B
-        ab[2, :-1] = -theta * dt * A[1:]
-        Vi = solve_banded((1, 1), ab, rhs)
+        # трёхдиагональная система: LAPACK dgtsv напрямую (без накладных расходов обёртки на каждом шаге)
+        *_, Vi, info = dgtsv(-theta * dt * A[1:], 1 - theta * dt * B, -theta * dt * C[:-1], rhs)
+        if info != 0:  # pragma: no cover
+            raise FloatingPointError(f"PDE: вырожденная трёхдиагональная система (info={info})")
         V = np.empty_like(V)
         V[1:-1] = Vi
         V[0] = rebate if lo_dir else 2 * Vi[0] - Vi[1]
@@ -126,3 +124,45 @@ def solve_pde(payoff: Callable[[np.ndarray], np.ndarray], S0: float, T: float, *
     delta = dVdx / S0
     gamma = (d2 - dVdx) / S0 ** 2
     return {"price": price, "delta": float(delta), "gamma": float(gamma), "grid_S": S, "grid_V": V}
+
+
+def term_structure_adjustment(payoff: Callable[[np.ndarray], np.ndarray], S0: float, F: float, T: float, df: float, *,
+                              log_fwd_growth: Callable[[np.ndarray], np.ndarray], cum_rate: Callable[[np.ndarray], np.ndarray],
+                              atm_total_var: Callable[[np.ndarray], np.ndarray], lower: float | None = None,
+                              upper: float | None = None, rebate: float = 0.0, n_x: int = 241, n_t: int = 160) -> float:
+    """Поправка закрытой формулы с плоскими r, q, σ на временную структуру.
+
+    Формулы барьеров (Reiner-Rubinstein, Ikeda-Kunitomo, Hui) предполагают
+    постоянные ставки и волатильность до экспирации. На рублёвом рынке кривая
+    ступенчатая (решения ЦБ), снос r_d − r_f сосредоточен в начале срока, и
+    вероятность касания барьера заметно отличается от плоской (до нескольких
+    процентов цены). Поправка = PDE(временная структура) − PDE(плоские
+    параметры) на одной сетке: ошибки дискретизации взаимно гасятся, концы
+    сохранены — форвард F в T, дисконт df и полная дисперсия σ_ATM(T)²·T.
+    """
+    if T <= 1.0 / 365:
+        return 0.0
+    ts = np.linspace(0.0, T, 201)
+    LT = float(np.log(F / S0))
+    g = np.asarray(log_fwd_growth(ts), float)
+    g = g - g[0]
+    lnF = np.log(S0) + (LT * g / g[-1] if abs(g[-1]) > 1e-10 else LT * ts / T)
+    R = np.asarray(cum_rate(ts), float)
+    R = R - R[0]
+    Rtot = -float(np.log(df))
+    Rs = Rtot * R / R[-1] if abs(R[-1]) > 1e-12 else Rtot * ts / T
+    tv = np.linspace(0.0, T, 41)
+    W = np.concatenate([[0.0], np.asarray(atm_total_var(tv[1:]), float)])
+    W = np.maximum.accumulate(W)
+    sig_T = float(np.sqrt(max(W[-1], 1e-12) / T))
+    tm, rate_seg = 0.5 * (ts[1:] + ts[:-1]), np.diff(Rs) / np.diff(ts)
+    tvm, sig_seg = 0.5 * (tv[1:] + tv[:-1]), np.sqrt(np.maximum(np.diff(W) / np.diff(tv), 1e-8))
+
+    def run(fwd, rate, sig):
+        return solve_pde(payoff, S0, T, fwd=fwd, rate=rate, vol=lambda t, x: np.full_like(x, sig(t)), lower=lower, upper=upper,
+                         rebate=rebate, n_x=n_x, n_t=n_t, sd_vol=sig_T)["price"]
+
+    p_ts = run(lambda t: float(np.exp(np.interp(t, ts, lnF))), lambda t: float(np.interp(t, tm, rate_seg)),
+               lambda t: float(np.interp(t, tvm, sig_seg)))
+    p_flat = run(lambda t: S0 * float(np.exp(LT * t / T)), lambda t: Rtot / T, lambda t: sig_T)
+    return p_ts - p_flat

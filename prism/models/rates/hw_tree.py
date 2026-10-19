@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 
 from ...core.provenance import DataKind, Provenance, UsedInput
-from ...instruments.schema import EarlyTerminationMod, ExerciseMod, Trade
+from ...instruments.schema import ExerciseMod, Trade
 
 
 class HWTree:

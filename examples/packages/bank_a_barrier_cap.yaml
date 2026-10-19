@@ -1,0 +1,50 @@
+# Банк А: кредит КС + 2.5% на 3 года с обязательной покупкой барьерного кэпа
+package_id: "A: КС+2.50% + барьерный кэп 15%/19%"
+bank: "Банк А"
+kind: loan_with_hedge
+description: "Кредит под ключевую ставку с отлагательным условием — покупка у банка барьерного кэпа"
+fees:
+  - {label: "комиссия за выдачу 0.5%", amount: 5000000, payment_date: "2026-10-16"}
+members:
+  - role: loan
+    trade:
+      identification: {trade_id: A-LOAN, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: "2026-10-15"}
+      product: "Кредит КС + 2.50%"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: interest
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          exchange_notional: both
+          components: [{kind: float, spread: 0.025, position: short}]
+  - role: derivative
+    description: "обязательный хедж: барьерный кэп, премия 11 млн руб."
+    trade:
+      identification: {trade_id: A-BCAP, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: "2026-10-15"}
+      product: "Барьерный кэп 15%, отключение выше 19%"
+      premium: {amount: 11000000, currency: RUB, payer: client, payment_date: "2026-10-16"}
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      model: {paths: 20000}
+      legs:
+        - name: caplets
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          components:
+            - kind: cap
+              strike: 0.15
+              modifiers: [{type: barrier, kind: out, direction: up, level: 0.19, monitoring: discrete, observation: fixings,
+                           observable: {type: rate, index: KEYRATE, compounding: simple_average}}]
+  - role: derivative
+    description: "премия по кэпу как отдельный платёж клиента"
+    trade:
+      identification: {trade_id: A-PREM, client: CLIENT_METAL, bank: BANK_DEMO, trade_date: "2026-10-15"}
+      product: "Премия по кэпу"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: premium
+          schedule: {dates: ["2026-10-16"], calendar: RU}
+          currency: RUB
+          notional: {currency: RUB, amount: 11000000}
+          components: [{kind: cash, payout: 1.0, position: short}]

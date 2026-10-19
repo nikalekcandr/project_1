@@ -112,7 +112,7 @@ def line_chart(x: Sequence[float], series: Sequence[dict[str, Any]], *, cid: str
         a, b = max(z["from"], x0), min(z["to"], x1)
         if b <= a:
             continue
-        cls = "zone-crit" if z.get("type") == "worse_than_unhedged" else "zone-warn"
+        cls = {"worse_than_unhedged": "zone-crit", "corridor": "zone-info"}.get(z.get("type"), "zone-warn")
         out.append(f'<rect class="{cls}" x="{sx(a):.1f}" y="{mt}" width="{sx(b) - sx(a):.1f}" height="{h}"/>')
     for v in yt:
         out.append(f'<line class="grid" x1="{ml}" x2="{ml + w}" y1="{sy(v):.1f}" y2="{sy(v):.1f}"/>')

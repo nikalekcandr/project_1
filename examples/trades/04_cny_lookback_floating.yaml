@@ -1,0 +1,16 @@
+# Lookback с плавающим страйком на CNYRUB: клиент получает разницу между курсом
+# на экспирации и минимумом ежедневных фиксингов ЦБ за период — модификатор
+# averaging с method: min и average_of: strike (экстремум вместо среднего).
+identification: {trade_id: LB-CNY-01, client: CLIENT_IMPORT, bank: BANK_DEMO, trade_date: "2026-10-15"}
+product: "Lookback-колл с плавающим страйком CNYRUB, 6 мес."
+purpose: {type: buy_fx}
+underlyings: {X: {asset_class: fx, id: CNYRUB, fixing: {source: CBR, lag_days: -1}}}
+model: {paths: 20000}
+legs:
+  - name: option
+    underlying: X
+    schedule: {start: "2026-10-16", dates: ["2027-04-16"], calendar: RU+CN, observation: daily}
+    notional: {currency: CNY, amount: 50000000}
+    components:
+      - kind: call
+        modifiers: [{type: averaging, method: min, average_of: strike}]

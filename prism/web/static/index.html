@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prism — прайсер внебиржевых ПФИ</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<div class="app">
+  <div class="appbar">
+    <div class="brand">Prism<small>независимая оценка внебиржевых ПФИ · разложение цены · только публичные данные</small></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="price">Оценка сделки</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="market">Рынок</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="compare">Сравнение предложений</button>
+      <button class="toggle" id="theme" type="button">Тема: системная</button>
+    </div>
+  </div>
+  <div id="demo-banner" class="demo hidden">Демонстрационный снапшот: рыночные данные иллюстративные — числа показывают работу методики, а не оценку реальной сделки.</div>
+
+  <!-- ОЦЕНКА -->
+  <div data-panel="price" class="grid2">
+    <div>
+      <div class="panel">
+        <h3>1. Структура из каталога</h3>
+        <div class="tpl-list" id="tpl-list"></div>
+        <div class="tpl-desc" id="tpl-desc"></div>
+        <form class="form" id="tpl-form" onsubmit="return false"></form>
+        <div class="btns"><button class="btn" id="btn-render" type="button">Собрать термшит</button></div>
+      </div>
+      <div class="panel" style="margin-top:12px">
+        <h3>2. Термшит (YAML)</h3>
+        <p class="status">Любое поле можно задать как <code>{value: 95.5, ref: "п. 4.1"}</code> — ссылка на место в документе попадёт в отчёт.</p>
+        <textarea class="yaml" id="yaml" spellcheck="false"></textarea>
+        <div class="btns">
+          <button class="btn primary" id="btn-quick" type="button">Оценить (быстро)</button>
+          <button class="btn" id="btn-full" type="button">Полная оценка</button>
+          <button class="btn" id="btn-price" type="button">Только цена</button>
+        </div>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+    <div id="result">
+      <div class="panel"><p class="status">Выберите структуру слева, при необходимости измените параметры или термшит и нажмите «Оценить». Результат: справедливая стоимость, разложение цены, ванильные альтернативы, профиль выплат с зонами отключения защиты, CVA и полный отчёт.</p></div>
+    </div>
+  </div>
+
+  <!-- РЫНОК -->
+  <div data-panel="market" class="hidden">
+    <div class="panel" id="market"><p class="status"><span class="spinner"></span>загрузка…</p></div>
+  </div>
+
+  <!-- СРАВНЕНИЕ -->
+  <div data-panel="compare" class="hidden">
+    <div class="panel">
+      <h3>Пакеты «кредит + обязательный хедж» от разных банков</h3>
+      <p class="status">Каждый пакет — YAML (кредит, дериватив, комиссии). Итог — эффективная ставка «всё включено», сопоставимая между банками.</p>
+      <div id="pkg-boxes"></div>
+      <div class="btns"><button class="btn" id="btn-addpkg" type="button">+ пакет</button><button class="btn primary" id="btn-compare" type="button">Сравнить</button></div>
+      <div id="compare-out"></div>
+    </div>
+  </div>
+</div>
+<script src="/app-charts.js"></script>
+<script>
+(function(){
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const fmt=(v,d)=>{if(v===null||v===undefined||!isFinite(v))return'—'; if(Math.abs(v)<1e-9) v=0; const a=Math.abs(v);
+  if(d!==undefined)return v.toLocaleString('ru-RU',{maximumFractionDigits:d,minimumFractionDigits:d});
+  if(a>=1e9)return (v/1e9).toLocaleString('ru-RU',{maximumFractionDigits:2})+' млрд';
+  if(a>=1e6)return (v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2})+' млн';
+  if(a>=1e4)return (v/1e3).toLocaleString('ru-RU',{maximumFractionDigits:0})+' тыс.';
+  return v.toLocaleString('ru-RU',{maximumFractionDigits:2});};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function api(url,body){const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  const t=await r.text(); let j; try{j=JSON.parse(t)}catch(e){throw new Error(t.slice(0,300))}
+  if(!r.ok) throw new Error(j.detail||t); return j;}
+// вкладки
+$$('.tab').forEach(b=>b.addEventListener('click',()=>{ $$('.tab').forEach(x=>x.setAttribute('aria-selected',x===b));
+  $$('[data-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==b.dataset.tab));
+  if(b.dataset.tab==='market') loadMarket(); }));
+// каталог
+let templates=[], current=null;
+async function loadTemplates(){templates=await api('/api/templates'); const box=$('#tpl-list'); const groups={};
+  templates.forEach(t=>{(groups[t.group||'Прочие']=groups[t.group||'Прочие']||[]).push(t)});
+  const order=['Валютные','Процентные','Инфляционные','Товарные','Долевые','Кредитные','Волатильность','Структурные','Прочие'];
+  box.innerHTML=Object.entries(groups).sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0])).map(([g,ts])=>`<div class="tpl-group">${esc(g)}</div>`+ts.map(t=>`<button type="button" class="tpl" data-id="${t.id}">${esc(t.name)}</button>`).join('')).join('');
+  box.querySelectorAll('.tpl').forEach(b=>b.addEventListener('click',()=>selectTpl(b.dataset.id)));
+  selectTpl('fx_forward_extra');}
+function selectTpl(id){current=templates.find(t=>t.id===id); $$('.tpl').forEach(b=>b.setAttribute('aria-current',b.dataset.id===id));
+  $('#tpl-desc').textContent=current.description||''; const f=$('#tpl-form');
+  f.innerHTML=Object.entries(current.params||{}).map(([k,p])=>{const lab=esc(p.label||k);
+    if(p.choices) return `<label>${lab}<select name="${k}">${p.choices.map(c=>`<option ${String(c)===String(p.default)?'selected':''}>${esc(c)}</option>`).join('')}</select></label>`;
+    const type=p.type==='date'?'date':(p.type==='float'||p.type==='int'?'number':'text');
+    return `<label>${lab}<input name="${k}" type="${type}" ${type==='number'?'step="any"':''} value="${esc(p.default)}"></label>`;}).join('');
+  render();}
+async function render(){const params={}; new FormData($('#tpl-form')).forEach((v,k)=>params[k]=v);
+  try{const r=await api('/api/render',{template:current.id,params}); $('#yaml').value=r.yaml; $('#status').textContent='';}
+  catch(e){$('#status').innerHTML=`<span class="err">${esc(e.message)}</span>`}}
+$('#btn-render').addEventListener('click',render);
+$('#tpl-form').addEventListener('change',render);
+// оценка
+async function price(mode){const btns=$$('#btn-quick,#btn-full,#btn-price'); btns.forEach(b=>b.disabled=true);
+  $('#status').innerHTML=`<span class="spinner"></span>оценка (${mode==='full'?'полная: греки, стрессы, XVA, альтернативы — до минуты':mode==='quick'?'быстрая':'только цена'})…`;
+  try{const r=await api('/api/price',{trade_yaml:$('#yaml').value,mode}); showResult(r); $('#status').textContent=`готово за ${fmt(Object.values(r.timings).reduce((a,b)=>a+b,0)/1000,1)} с`;}
+  catch(e){$('#status').innerHTML=`<span class="err">${esc(e.message)}</span>`}
+  finally{btns.forEach(b=>b.disabled=false)}}
+$('#btn-quick').addEventListener('click',()=>price('quick')); $('#btn-full').addEventListener('click',()=>price('full')); $('#btn-price').addEventListener('click',()=>price('price'));
+function tile(l,v,d,hero){return `<div class="tile${hero?' hero':''}"><div class="l">${esc(l)}</div><div class="v">${v}</div><div class="d">${esc(d||'')}</div></div>`}
+function showResult(r){$('#demo-banner').classList.toggle('hidden',!r.demo); const b=r.breakdown;
+  let h=`<div class="panel"><h3>${esc(r.product)}</h3><div class="tiles">`+tile('Справедливая стоимость для компании (mid)',fmt(r.value)+' ₽',r.engine,true);
+  if(b){h+=tile('Передача стоимости банку',fmt(b.transfer)+' ₽','премия − mid');
+    const res=b.waterfall[b.waterfall.length-1].value; h+=tile('Наценка сверх обоснованного',b.transfer>0?fmt(res)+' ₽':'нет',b.transfer>0&&b.residual_bp_pa!=null?((b.residual_pct*100).toFixed(2)+'% номинала · '+fmt(b.residual_bp_pa,0)+' б.п. годовых'):'');}
+  if(r.xva) h+=tile('CVA (с WWR)',fmt(r.xva.cva_wwr??r.xva.cva)+' ₽',r.xva.method||'');
+  if(r.mc) h+=tile('Монте-Карло',`± ${fmt(r.mc.stderr)} ₽`,`${r.mc.paths} путей, seed ${r.mc.seed}`);
+  h+=`</div><div class="btns"><a class="btn" target="_blank" href="/api/report/${r.report_id}">Открыть полный отчёт</a><a class="btn" target="_blank" href="/api/record/${r.report_id}">Аудиторская запись (JSON)</a></div>`;
+  (r.warnings||[]).slice(0,6).forEach(w=>h+=`<div class="warnbox">${esc(w)}</div>`); (r.errors||[]).forEach(w=>h+=`<div class="warnbox">✕ ${esc(w)}</div>`);
+  h+=`<p class="status">Модель: ${esc(r.model)}</p></div>`;
+  if(r.breakdown_svg) h+=`<div class="panel" style="margin-top:12px"><h3>Разложение цены</h3>${r.breakdown_svg}</div>`;
+  if(r.alternatives){h+=`<div class="panel" style="margin-top:12px"><h3>Ванильные альтернативы</h3><div class="tbl-wrap"><table><thead><tr><th>Вариант</th><th>Стоимость для компании</th><th>Описание</th></tr></thead><tbody>`+
+    `<tr class="hl"><td><b>Предложенная структура</b></td><td class="num">${fmt(r.value)} ₽</td><td>—</td></tr>`+
+    r.alternatives.map(a=>`<tr><td>${esc(a.label)}</td><td class="num">${fmt(a.value)} ₽</td><td>${esc(a.description)}</td></tr>`).join('')+`</tbody></table></div>`;
+    if(r.profile_svg) h+=r.profile_svg+'<ul>'+(r.profile_summary||[]).map(s=>`<li>${esc(s)}</li>`).join('')+'</ul>';
+    h+='</div>';}
+  if(r.greeks){h+=`<div class="panel" style="margin-top:12px"><h3>Чувствительности</h3><div class="kv">`;
+    Object.entries(r.greeks).forEach(([k,g])=>{ if(k==='theta_1d'){h+=`<span>Тета за 1 день</span><b>${fmt(g)} ₽</b>`;return;}
+      Object.entries(g).forEach(([n,v])=>h+=`<span>${esc(k)}: ${esc({delta:'дельта',gamma_pnl_1pct:'гамма (P&L на 1%)',vega_1pt:'вега на 1 п.',dv01:'DV01'}[n]||n)}</span><b>${fmt(v)}</b>`);});
+    h+='</div></div>';}
+  if(r.stresses){h+=`<div class="panel" style="margin-top:12px"><h3>Стрессы</h3><div class="tbl-wrap"><table><tbody>`+r.stresses.map(s=>`<tr><td>${esc(s.label)}</td><td class="num">${fmt(s.pnl)} ₽</td></tr>`).join('')+'</tbody></table></div></div>';}
+  $('#result').innerHTML=h; window.prismBindCharts($('#result'));}
+// рынок
+let marketLoaded=false;
+async function loadMarket(){if(marketLoaded)return; try{const m=await api('/api/market'); marketLoaded=true; $('#demo-banner').classList.toggle('hidden',!m.demo);
+  let h=`<h3>Ступенчатый короткий конец: форвард ключевой ставки между заседаниями ЦБ</h3>${m.keyrate_svg}`;
+  h+=`<h3>Имплицированные рынком решения Совета директоров</h3><p class="status">Модель двух соседних исходов с шагом 50 б.п.; надёжность снижается за последним коротким инструментом (дальние заседания определяются длинными свопами).</p><div class="tbl-wrap"><table><thead><tr><th>Объявление</th><th>Вступление в силу</th><th>Ставка до</th><th>После</th><th>Ожидание, б.п.</th><th>Исходы</th></tr></thead><tbody>`+
+    m.meetings.map(x=>`<tr><td>${x.announcement}</td><td>${x.effective}</td><td class="num">${(x.rate_before*100).toFixed(2)}%</td><td class="num">${(x.rate_after*100).toFixed(2)}%</td><td class="num">${fmt(x.expected_change_bp,1)}</td><td>${x.outcomes.map(o=>`${o.change_bp>0?'+':''}${o.change_bp.toFixed(0)}: ${(o.probability*100).toFixed(0)}%`).join(', ')}</td></tr>`).join('')+'</tbody></table></div>';
+  h+=`<h3>Репрайсинг калибровочных инструментов (макс. ошибка, б.п.; допуск 0.5)</h3><div class="kv">`+Object.entries(m.curves).map(([k,v])=>`<span>${esc(k)}</span><b class="${v<=0.5?'ok':'fail'}">${v.toFixed(3)}</b>`).join('')+'</div>';
+  Object.entries(m.cip).forEach(([p,rows])=>{h+=`<h3>Покрытый паритет ${p}: базис имплицированной рублёвой ставки к onshore</h3><div class="tbl-wrap"><table><thead><tr><th>Дата</th><th>Аутрайт</th><th>Имплиц. RUB</th><th>Onshore</th><th>Базис, б.п.</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td>${r.date}</td><td class="num">${fmt(r.outright,4)}</td><td class="num">${(r.implied_rate*100).toFixed(2)}%</td><td class="num">${(r.onshore_rate*100).toFixed(2)}%</td><td class="num">${fmt(r.basis_bp,0)}</td></tr>`).join('')+'</tbody></table></div>';});
+  h+=`<h3>Контроль качества снапшота ${esc(m.snapshot)}</h3>`+(m.qc.length?`<div class="tbl-wrap"><table><tbody>`+m.qc.map(q=>`<tr><td>${esc(q.severity)}</td><td>${esc(q.check)}</td><td><code>${esc(q.quote_id)}</code></td><td>${esc(q.message)}</td></tr>`).join('')+'</tbody></table></div>':'<p class="ok">замечаний нет</p>');
+  $('#market').innerHTML=h; window.prismBindCharts($('#market'));}catch(e){$('#market').innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+// сравнение пакетов
+function addPkg(text){const d=document.createElement('div'); d.innerHTML=`<textarea class="yaml" style="min-height:220px;margin:6px 0">${esc(text||'')}</textarea>`; $('#pkg-boxes').appendChild(d);}
+$('#btn-addpkg').addEventListener('click',()=>addPkg(''));
+(async()=>{try{const ex=await api('/api/examples/packages'); ex.forEach(p=>addPkg(p.yaml)); if(!ex.length) addPkg('');}catch(e){addPkg('')}})();
+$('#btn-compare').addEventListener('click',async()=>{const pk=$$('#pkg-boxes textarea').map(t=>t.value).filter(t=>t.trim());
+  $('#compare-out').innerHTML='<p class="status"><span class="spinner"></span>расчёт…</p>';
+  try{const r=await api('/api/compare',{packages:pk}); const keys=Object.keys(r.table[0].components_bp);
+    $('#compare-out').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Пакет</th><th>Банк</th><th>Эффективная ставка</th><th>К лучшему, б.п.</th>${keys.map(k=>`<th>${esc(k)}, б.п.</th>`).join('')}</tr></thead><tbody>`+
+    r.table.map(x=>`<tr class="${x.package===r.best?'hl':''}"><td>${esc(x.package)}</td><td>${esc(x.bank)}</td><td class="num"><b>${(x.effective_rate*100).toFixed(3)}%</b></td><td class="num">${fmt(x.vs_best_bp,1)}</td>${keys.map(k=>`<td class="num">${fmt(x.components_bp[k],1)}</td>`).join('')}</tr>`).join('')+
+    `</tbody></table></div><p class="status">Лучшее предложение: <b>${esc(r.best)}</b>. Эффективная ставка — эквивалентная фиксированная ставка по всем платежам пакета (проценты, деривативы по справедливой стоимости, комиссии) при рыночных кривых. Она сравнивает стоимость, но не качество защиты: своп фиксирует ставку полностью, кэп защищает выше страйка, барьерный кэп отключается при сильном росте — смотрите профиль выплат каждого дериватива на вкладке «Оценка сделки».</p>`;}
+  catch(e){$('#compare-out').innerHTML=`<p class="err">${esc(e.message)}</p>`}});
+loadTemplates();
+})();
+</script>
+</body>
+</html>

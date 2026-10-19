@@ -1,17 +1,17 @@
 {
- "snapshot": "20261015T1845-demo-e296e59cf2",
- "snapshot_hash": "e296e59cf27848ed25199be1767a33ce1e58ca198759af5d920678653d7491b6",
+ "snapshot": "20261015T1845-demo-37da05ed8c",
+ "snapshot_hash": "37da05ed8cd4220a3825c6a940eda65e68a7ab32da430c869e34e06d331603ae",
  "mc_paths": 8000,
  "values": {
   "fx_forward": -1370608.2696163366,
   "ndf": -953329.9063606061,
   "fx_vanilla": 2713028.84066356,
-  "fx_barrier": 1025740.3320264022,
-  "fx_double_barrier": 1869106.3255219054,
-  "fx_touch": 2828811.8999023084,
-  "fx_dnt": 3658292.141583786,
+  "fx_barrier": 1001262.6103631879,
+  "fx_double_barrier": 1872271.420854903,
+  "fx_touch": 2901406.90758368,
+  "fx_dnt": 3716283.692168284,
   "fx_collar": -5652989.474451888,
-  "fx_forward_extra": -5963576.323298922,
+  "fx_forward_extra": -5783232.185405856,
   "fx_leveraged_forward": -15278441.4431602,
   "fx_asian": 14715049.029997738,
   "irs_keyrate": -10541754.043500695,
@@ -25,12 +25,29 @@
   "cds": -36171836.64020702,
   "cln": 107217106.79738186,
   "commodity_asian_option": 31211743.95422517,
-  "equity_option": 24050402.733939078,
+  "equity_option": 24050474.815884646,
   "variance_swap": 15764072.044288548,
   "weather_hdd": 544360.0567261428,
-  "fx_tarf": -15166878.36421994,
-  "fx_accumulator": -14228629.15587414,
+  "fx_tarf": -15166878.367266398,
+  "fx_accumulator": -14228629.15587413,
   "barrier_cap": 7030923.270099262,
-  "autocallable": 94467996.04429692
- }
+  "autocallable": 94465947.22162323
+ },
+ "history": [
+  {
+   "at": "2026-10-19T15:15:31+00:00",
+   "reason": "SVI: аналитические якобианы в SLSQP (точнее оптимум на коротком срезе SBER) — сдвиг equity_option 3e-6, autocallable 2e-5; поправка барьерных формул на временную структуру ставок/волы (PDE)",
+   "code": "fede956f6160dada394cdbc981aab11a7b52d78ff9c44d523bbf91c71440672c",
+   "changed": {
+    "equity_option": {
+     "old": 24050402.733939078,
+     "new": 24050474.815884646
+    },
+    "autocallable": {
+     "old": 94467996.04429692,
+     "new": 94465947.22162323
+    }
+   }
+  }
+ ]
 }

@@ -1,0 +1,41 @@
+# Банк Б: кредит КС + 2.8% с обязательным ванильным кэпом 16%
+package_id: "Б: КС+2.80% + ванильный кэп 16%"
+bank: "Банк Б"
+kind: loan_with_hedge
+fees:
+  - {label: "комиссия за выдачу 0.3%", amount: 3000000, payment_date: "2026-10-16"}
+members:
+  - role: loan
+    trade:
+      identification: {trade_id: B-LOAN, client: CLIENT_METAL, bank: BANK_OTHER, trade_date: "2026-10-15"}
+      product: "Кредит КС + 2.80%"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: interest
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          exchange_notional: both
+          components: [{kind: float, spread: 0.028, position: short}]
+  - role: derivative
+    trade:
+      identification: {trade_id: B-CAP, client: CLIENT_METAL, bank: BANK_OTHER, trade_date: "2026-10-15"}
+      product: "Ванильный кэп 16%"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: caplets
+          underlying: KS
+          schedule: {start: "2026-10-16", end: "2029-10-16", frequency: 3M, calendar: RU}
+          notional: {currency: RUB, amount: 1000000000}
+          components: [{kind: cap, strike: 0.16}]
+  - role: derivative
+    trade:
+      identification: {trade_id: B-PREM, client: CLIENT_METAL, bank: BANK_OTHER, trade_date: "2026-10-15"}
+      product: "Премия по кэпу"
+      underlyings: {KS: {asset_class: rate, id: KEYRATE}}
+      legs:
+        - name: premium
+          schedule: {dates: ["2026-10-16"], calendar: RU}
+          currency: RUB
+          notional: {currency: RUB, amount: 7500000}
+          components: [{kind: cash, payout: 1.0, position: short}]

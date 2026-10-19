@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import fnmatch
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -29,7 +29,7 @@ from ..core.dates import Tenor, add_tenor
 from ..core.daycount import DayCount
 from ..core.provenance import DataKind, InputTracker, Provenance, UsedInput
 from ..curves.base import YieldCurve
-from ..curves.bootstrap import (SELF, BasisSwapInstrument, DepositInstrument, deposit_from_tenor, fit_curve,
+from ..curves.bootstrap import (SELF, BasisSwapInstrument, deposit_from_tenor, fit_curve,
                                 swap_from_tenor)
 from ..curves.cbr import Meeting, check_meeting_coverage, implied_meeting_path, load_meetings
 from ..curves.commodity import CommodityCurve, EquityForward
@@ -96,8 +96,10 @@ class MarketContext:
         self.ref_date = ref_date or self.base_date
         self.sticky_override = sticky
         self.allow_projected_fixings = allow_projected_fixings
-        self._cache: dict[str, Any] = dict(_cache or {})
-        self._deps: dict[str, set[str]] = {k: set(v) for k, v in (_deps or {}).items()}
+        # кэш общий для контекстов-шоков и сдвигов даты (шоки применяются при доступе, базовые объекты не меняются);
+        # для бампов котировок передаётся отфильтрованная копия — см. bumped()
+        self._cache: dict[str, Any] = _cache if _cache is not None else {}
+        self._deps: dict[str, set[str]] = _deps if _deps is not None else {}
         self._building: list[str] = []
         self._warm: dict[str, Any] = _warm if _warm is not None else {}   # тёплый старт калибровок (общий для производных контекстов)
 

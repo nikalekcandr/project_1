@@ -227,8 +227,13 @@ class BarrierMod(_M):
 
 
 class AveragingMod(_M):
+    """Агрегирование наблюдений периода: среднее (азиатские) или экстремум (lookback).
+
+    ``method: max|min`` — lookback: с ``average_of: price`` — фиксированный страйк
+    (max − K)+, с ``average_of: strike`` — плавающий страйк (X_T − min)+.
+    Наблюдение дискретное, по расписанию (обычно ежедневно — как в контракте)."""
     type: Literal["averaging"] = "averaging"
-    method: Literal["arithmetic", "geometric"] = "arithmetic"
+    method: Literal["arithmetic", "geometric", "max", "min"] = "arithmetic"
     average_of: Literal["price", "strike"] = "price"   # (не «on»: в YAML 1.1 это булево значение)
     frequency: str | None = None       # если не задано — наблюдения расписания ноги
     weights: list[float] | None = None
@@ -382,7 +387,13 @@ class Leg(_M):
     settlement: SettlementSpec | None = None
     exchange_notional: Literal["none", "initial", "final", "both"] = "none"
     notional_reset: bool = False           # MtM CCS: ресет номинала по курсу на начало периода
-    reset_pair: str | None = None
+    reset_pair: str | None = None          # курс ресета: номинал периода = N₀·X(начало)/X(начало первого периода)
+
+    @model_validator(mode="after")
+    def _check_reset(self):
+        if self.notional_reset and not self.reset_pair:
+            raise ValueError(f"нога {self.name}: notional_reset требует reset_pair (курс ресета номинала)")
+        return self
 
 
 # --------------------------------------------------------------------------- прочие блоки
