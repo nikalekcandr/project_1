@@ -64,7 +64,7 @@ from xml.sax.saxutils import escape as xml_escape
 APP_NAME = "Генштаб"
 APP_ID = "genshtab"
 BUNDLE_ID = "local.genshtab.app"
-VERSION = "10.0"
+VERSION = "11.0"
 FROZEN = bool(getattr(sys, "frozen", False))
 SCRIPT_PATH = Path(sys.executable if FROZEN else __file__).resolve()
 DATA_FILE = Path(os.environ.get("GENSHTAB_DATA") or os.environ.get("TEMPO_DATA")
@@ -6664,11 +6664,11 @@ class ReviewDialog(tk.Toplevel):
         self.destroy()
 
 
-# ───────────────────────── кампания-85: данные ─────────────────────────
+# ───────────────────────── кампания-70: данные ─────────────────────────
 
 SYS_VERSION = 2
-CAMPAIGN = "Кампания-85"
-CAMPAIGN_START = "2026-10-08"
+CAMPAIGN = "Кампания-70"
+CAMPAIGN_START = "2026-10-23"
 CAMPAIGN_END = "2026-12-31"
 SYS_TRAININGS = ("Сила", "Кардио / интервалы", "Игровой спорт", "Короткая", "Восстановление", "Нет")
 SYS_TRAIN_COUNTED = ("Сила", "Кардио / интервалы", "Игровой спорт", "Короткая")
@@ -6713,7 +6713,7 @@ LEAVE_TYPE = "Увольнение"
 EXAM_TYPE = "Рубеж"
 
 SYS_PHASES = [
-    {"name": "Прорыв", "start": "2026-10-08",
+    {"name": "Прорыв", "start": "2026-10-23",
      "focus": "Рубежи модуля 1: экзамен по микроструктуре и контрольная по эконометрике. Пересдачи ТВ и МС — "
               "закрыть с первой попытки. SQL целиком к 01.11. Облигации и финсистема — старт с учебника."},
     {"name": "Наступление", "start": "2026-11-02",
@@ -6748,12 +6748,12 @@ SYS_NO_COUNT = ["Репетиторство", "Личное"]
 
 SYS_TOUCH_PLAN = {}
 
-SYS_RULES = """УСТАВ КАМПАНИИ-85
-08.10–31.12.2026: 85 дней до Нового года. Каждый день либо засчитан, либо объяснён.
+SYS_RULES = """УСТАВ КАМПАНИИ-70
+23.10–31.12.2026: 70 дней до Нового года. Каждый день либо засчитан, либо объяснён.
 
 ЗАДАЧИ КАМПАНИИ
-• Часы: 750 сфокусированных часов — в среднем 8,8 в день. Шаблон недели: пять боевых дней по 10 ч,
-  марш 7 ч, тыловой 6 ч — 63 ч в неделю, около 760 за кампанию. Считаются штурм (таймер),
+• Часы: 630 сфокусированных часов — в среднем 9 в день. Шаблон недели: пять боевых дней по 10 ч,
+  марш 7 ч, тыловой 6 ч — 63 ч в неделю, 630 за кампанию. Считаются штурм (таймер),
   автохронометраж по учебнику и записи без таймера с результатом. Пары считаются.
 • Пересдачи теории вероятностей и матстатистики — с первой попытки.
 • Рубежи (оценки): ни одной ниже 8, среднее 9+. 100% ДЗ в срок, лекция обработана за 48 часов,
@@ -6825,7 +6825,7 @@ SYS_RULES = """УСТАВ КАМПАНИИ-85
 • Питание — пять правил из сводки. Без воскресных заготовок первыми ломаются белок и фастфуд.
 
 ЭТАПЫ
-• Прорыв 08.10–01.11 · Наступление 02.11–29.11 · Решающий штурм 30.11–31.12.
+• Прорыв 23.10–01.11 · Наступление 02.11–29.11 · Решающий штурм 30.11–31.12.
 • 01.11 и 29.11 — рубеж этапа: разбор, развилка, пересборка бюджета направлений на этой вкладке.
 • 31.12 — финиш: итоговый разбор кампании и план на 2027."""
 
@@ -7096,12 +7096,12 @@ def sys_default_skills():
     skills = [
         {"name": "SQL", "project": "SQL",
          "result": "LeetCode SQL 50 полностью и sql-ex.ru: JOIN, подзапросы, CTE, оконные функции без подсказок",
-         "checkpoints": cps([("2026-10-11", "SELECT, JOIN, GROUP BY"), ("2026-10-18", "подзапросы и CTE"),
-                             ("2026-10-25", "оконные функции"), ("2026-11-01", "SQL 50 закрыт")])},
+         "checkpoints": cps([("2026-10-23", "SELECT, JOIN, GROUP BY"), ("2026-10-26", "подзапросы и CTE"),
+                             ("2026-10-29", "оконные функции"), ("2026-11-01", "SQL 50 закрыт")])},
         {"name": "Python-проект", "project": "Python-проект",
          "result": "Один законченный проект на GitHub: README, воспроизводимый код, результаты. Кандидат номер один — "
                    "QPM-модель и инструменты для олимпиады по ДКП (заодно закрывает макро)",
-         "checkpoints": cps([("2026-10-11", "выбран проект и скоуп"), ("2026-11-15", "рабочая версия"),
+         "checkpoints": cps([("2026-10-24", "выбран проект и скоуп"), ("2026-11-15", "рабочая версия"),
                              ("2026-11-29", "README и чистый репозиторий")])},
         {"name": "Продвинутая макро", "project": "Олимпиада ДКП",
          "result": "Уверенно применять новокейнсианскую модель из трёх уравнений, правило Тейлора, трансмиссию ДКП "
@@ -7131,8 +7131,8 @@ def sys_default_skills():
 
 def sys_default_events():
     items = [
-        ("2026-10-08", "", "Старт кампании-85: построение, Устав, бюджет направлений", "Система", "Запланировано"),
-        (None, "до 12.10", "Даты всех рубежей в «Рубежах»: тесты, контрольные, экзамены, проекты", "Курсы", "Уточнить"),
+        ("2026-10-23", "", "Старт кампании-70: построение, Устав, бюджет направлений", "Система", "Запланировано"),
+        (None, "23–25.10", "Даты всех рубежей в «Рубежах»: тесты, контрольные, экзамены, проекты", "Курсы", "Уточнить"),
         (None, "еженедельно до середины ноября", "Турнир по прогнозированию: 25 прогнозов в неделю",
          "Курсы", "Запланировано"),
         (None, "уточнить", "Тесты SHL для гранта ВТБ: Призма, мотивационные предикторы, серии диаграмм",
@@ -7244,7 +7244,7 @@ REWARD_KINDS = {"hours": "часов в кампании", "touches": "каса�
 SYS_REWARDS = [("Медаль «За стойкость»", "hours", 100, "вечер без учёбы, любое кино"),
                ("Орден «Первой линии»", "hours", 250, "книга или вещь до 3000 ₽"),
                ("Орден «Генштаба»", "hours", 500, "полностью свободный день"),
-               ("Звезда «Кампании-85»", "hours", 750, "выбери сам — крупное"),
+               ("Звезда «Кампании-70»", "hours", 630, "выбери сам — крупное"),
                ("Гвардейский знак", "good_streak", 14, "выбери сам"),
                ("Знак «Без отступления»", "checkin_streak", 30, "ужин в хорошем месте")]
 
@@ -7629,7 +7629,7 @@ def sys_defaults():
         "version": SYS_VERSION,
         "start": CAMPAIGN_START,
         "end": CAMPAIGN_END,
-        "goals": {"hours": 750, "touches": 0, "trainings": 6, "sleep": 7.5, "food": 4, "wake": "07:00",
+        "goals": {"hours": 630, "touches": 0, "trainings": 6, "sleep": 7.5, "food": 4, "wake": "07:00",
                   "grade_min": 8, "grade_avg": 9},
         "checkin_hour": 21,
         "day_types": [dict(t) for t in SYS_DAY_TYPES],
@@ -7682,9 +7682,33 @@ def sys_defaults():
         "check_runs": {},
         "fitness": fitness_defaults(),
         "money": money_defaults(),
+        "soldier": {"profile": "Боевой", "checks": {}},
         "next_campaign": {},
         "signals": [],
     }
+
+
+SOLDIER_CHECKS = (
+    ("order", "Приказ записан: один конкретный главный результат"),
+    ("phone", "Телефон убран, рабочее место готово"),
+    ("focus", "Первый штурм выполнен без переключений"),
+    ("body", "Движение и питание по самочувствию"),
+    ("report", "Доклад: результат, препятствие, следующий шаг"),
+    ("sleep", "Время отбоя назначено, сон не менее 7,5 часов"),
+)
+
+
+def replan_70(system):
+    """Явное перепланирование: история и пользовательские правила не удаляются."""
+    import copy
+    keys = ("name", "start", "end", "goals", "phases", "rules_text")
+    system.setdefault("archive", {}).setdefault("before_70", {
+        k: copy.deepcopy(system.get(k)) for k in keys})
+    system.update(name=CAMPAIGN, start=CAMPAIGN_START, end=CAMPAIGN_END,
+                  phases=[dict(p) for p in SYS_PHASES])
+    system.setdefault("goals", {})["hours"] = 630
+    # Пользовательский текст Устава не заменяем, даже если он содержит старое название.
+    return system
 
 
 def normalize_system(raw):
@@ -7697,6 +7721,12 @@ def normalize_system(raw):
             out[key] = value
         elif key in base and isinstance(base[key], float) and isinstance(value, int):
             out[key] = value
+    soldier = out.get("soldier")
+    if not isinstance(soldier, dict):
+        soldier = {}
+    if not isinstance(soldier.get("checks"), dict):
+        soldier["checks"] = {}
+    out["soldier"] = soldier
     goals = dict(base["goals"])
     goals.update(raw.get("goals") or {})
     out["goals"] = goals
@@ -7861,12 +7891,12 @@ def normalize_kit(out, base):
 
 
 SYS_SEED_TASKS = [
-    ("Построение: прочитать Устав кампании-85 и проверить бюджет направлений", "", 1, CAMPAIGN_START, True),
-    ("Вписать даты пересдач ТВ и МС в «Рубежи»", "Пересдачи ТВ/МС", 1, "2026-10-09", False),
-    ("Вписать даты всех рубежей в «Рубежи»: тесты, контрольные, экзамены, проекты", "", 1, "2026-10-12", False),
-    ("Силлабус ML (Гущин): формула оценки → «Рубежи»", "Machine Learning", 2, "2026-10-10", False),
-    ("Силлабус фининжа (Горовой): формула оценки → «Рубежи»", "Financial Engineering", 2, "2026-10-10", False),
-    ("Облигации: выбрать учебник и расписать главы до 31.12", "Облигации и финсистема", 2, "2026-10-12", False),
+    ("Построение: прочитать Устав кампании-70 и проверить бюджет направлений", "", 1, CAMPAIGN_START, True),
+    ("Вписать даты пересдач ТВ и МС в «Рубежи»", "Пересдачи ТВ/МС", 1, "2026-10-23", False),
+    ("Вписать даты всех рубежей в «Рубежи»: тесты, контрольные, экзамены, проекты", "", 1, "2026-10-25", False),
+    ("Силлабус ML (Гущин): формула оценки → «Рубежи»", "Machine Learning", 2, "2026-10-24", False),
+    ("Силлабус фининжа (Горовой): формула оценки → «Рубежи»", "Financial Engineering", 2, "2026-10-24", False),
+    ("Облигации: выбрать учебник и расписать главы до 31.12", "Облигации и финсистема", 2, "2026-10-25", False),
 ]
 # при переезде с Темпа добавляются только задачи кампании — старые задачи остаются как есть
 CAMPAIGN_TASKS = (0, 2, 5)
@@ -7910,7 +7940,7 @@ def _rows_to_blocks(rows):
 
 
 def migrate_campaign(raw, store):
-    """Система 96 дней (Темп 8.0) → кампания-85 (Генштаб 9.0). История дней, сессии, оценки, навыки, сеть
+    """Система 96 дней (Темп 8.0) → кампания-70 (Генштаб 9.0). История дней, сессии, оценки, навыки, сеть
     и журнал остаются. Меняются период, цели, режимы дней, этапы, бюджеты, расписание, награды и дежурный.
     Прежние настройки сохраняются в system.archive.v1."""
     keep = ("start", "end", "goals", "phases", "budgets", "day_types", "weekday_types", "blocks", "touch_plan",
@@ -7921,7 +7951,7 @@ def migrate_campaign(raw, store):
     raw["archive"] = arch
     raw["start"], raw["end"] = CAMPAIGN_START, CAMPAIGN_END
     goals = raw.get("goals") if isinstance(raw.get("goals"), dict) else {}
-    goals.update(hours=750, touches=0)
+    goals.update(hours=630, touches=0)
     raw["goals"] = goals
 
     # режимы дня: старые названия → новые, свои типы остаются
@@ -8029,7 +8059,7 @@ def migrate_campaign(raw, store):
     raw["aliases"] = al
     journal = raw.get("journal") if isinstance(raw.get("journal"), list) else []
     journal.append({"ts": datetime.now().isoformat(timespec="seconds"), "kind": "campaign",
-                    "text": "Генштаб: развёрнута кампания-85 (08.10–31.12), система 96 дней — в архиве"})
+                    "text": "Генштаб: развёрнута кампания-70 (23.10–31.12), система 96 дней — в архиве"})
     raw["journal"] = journal
     for h in store.habits:
         if h.get("auto") == "hours" and h.get("title") == "План часов на день":
@@ -8692,7 +8722,7 @@ class CampaignMixin:
 
     def _forecast(self, today, sims):
         start, end = self.start(), self.end()
-        goal = self.goal("hours", 750)
+        goal = self.goal("hours", 630)
         hist = self.history_ratios(today)
         ratios = [r for _d, r in hist]
         prior = len(ratios) < 3
@@ -9958,10 +9988,10 @@ class System(CampaignMixin, KitMixin):
         if y >= start:
             plan, fact = self.plan_between(start, y), self.hours_between(start, y)
             if plan > 0 and plan - fact >= 5 and fact < plan * 0.9:
-                need = max(0.0, self.goal("hours", 750) - self.hours_total()) / max(1, self.days_to_finish(today))
+                need = max(0.0, self.goal("hours", 630) - self.hours_total()) / max(1, self.days_to_finish(today))
                 out.append(("bad" if fact < plan * 0.75 else "warn",
                             f"Часы: {fmt_h(fact)} из {fmt_h(plan)} по плану к вчерашнему дню, отставание "
-                            f"{fmt_h(plan - fact)} ч. До {int(self.goal('hours', 750))} нужно {fmt_h(need)} ч в день.",
+                            f"{fmt_h(plan - fact)} ч. До {int(self.goal('hours', 630))} нужно {fmt_h(need)} ч в день.",
                             None, None))
         d1, d2 = today - timedelta(days=1), today - timedelta(days=2)
         if d2 >= start and all(self.day_plan(d) > 0 and self.hours_on(d) < self.day_plan(d) * 0.5 for d in (d1, d2)):
@@ -10381,7 +10411,7 @@ class System(CampaignMixin, KitMixin):
         lines += self.kit_report_lines(d, d)
         r = self.rank(d)
         lines.append(f"Звание: {r['name']} · резерв {self.reserve_left(d)} · нарядов {len(self.duties_open())}")
-        lines.append(f"Всего: {fmt_h(self.hours_total())} ч из {int(self.goal('hours', 750))}"
+        lines.append(f"Всего: {fmt_h(self.hours_total())} ч из {int(self.goal('hours', 630))}"
                      + (f", касаний {self.touches_total()} из {int(self.goal('touches', 500))}" if self.quota() else ""))
         return "\n".join(lines)
 
@@ -10463,7 +10493,7 @@ class System(CampaignMixin, KitMixin):
                  f"Неделя: {fmt_h(self.hours_between(monday, today))} из {fmt_h(self.plan_between(monday, week_end))} ч"
                  + (f", касаний {self.touches_between(monday, today)} из {self.touch_target(week_monday(today))}"
                     if q else ""),
-                 f"Всего: {fmt_h(self.hours_total())} из {int(self.goal('hours', 750))} ч"
+                 f"Всего: {fmt_h(self.hours_total())} из {int(self.goal('hours', 630))} ч"
                  + (f", касаний {self.touches_total()} из {int(self.goal('touches', 500))}" if q else "")]
         cards = self.cards_line()
         if cards:
@@ -19287,7 +19317,7 @@ def course_short(name):
 class SystemView(tk.Frame):
     """Ставка: как идёт кампания — приказ, фронты, разведка, наряды, дневник, навыки, календарь, дежурный, устав."""
 
-    TABS = [("overview", "Сводка"), ("fronts", "Фронты"), ("intel", "Разведка"), ("duty", "Наряды"),
+    TABS = [("overview", "Сводка"), ("soldier", "Солдат"), ("fronts", "Фронты"), ("intel", "Разведка"), ("duty", "Наряды"),
             ("dossier", "Личное дело"), ("diary", "Дневник"), ("skills", "Навыки"), ("calendar", "Календарь"),
             ("discipline", "Дежурный"), ("plan", "Устав")]
     CAL_FILTERS = [("upcoming", "Предстоящие"), ("undated", "Без даты"), ("all", "Все")]
@@ -19430,6 +19460,51 @@ class SystemView(tk.Frame):
         cols.columnconfigure(1, weight=2, uniform="c")
         self._upcoming(cols, today).grid(row=0, column=0, sticky="nsew", padx=(0, px(8)))
         self._skills_mini(cols).grid(row=0, column=1, sticky="nsew")
+
+    def _tab_soldier(self):
+        app, sysm = self.app, self.app.system
+        today = app.today()
+        cfg = sysm.s.setdefault("soldier", {"profile": "Боевой", "checks": {}})
+        outer, card = ui_card(self.body, app)
+        outer.pack(fill="x", pady=(0, app.px(12)))
+        ui_text(card, app, "СОЛДАТ · приказ → действие → доклад", font="h2").pack(anchor="w")
+        ui_text(card, app, "Твёрдый порядок без саморазрушения. Сон важнее лишнего часа. "
+                "При болезни — оборона, при перегрузке — пересмотр плана.").pack(fill="x")
+        if sysm.s.get("start") != CAMPAIGN_START or sysm.s.get("end") != CAMPAIGN_END:
+            def replan():
+                if not messagebox.askyesno(APP_NAME, "Перестроить кампанию на 23.10–31.12.2026 и 630 часов? "
+                        "Сессии, дни, оценки и выслуга сохранятся. Старый план будет в архиве; "
+                        "итоги текущей кампании будут считаться с 23 октября.", parent=app):
+                    return
+                try:
+                    app.store.backup_now()
+                except OSError as exc:
+                    messagebox.showerror(APP_NAME, str(exc), parent=app)
+                    return
+                replan_70(sysm.s)
+                app.store.save()
+                sysm.invalidate()
+                self.refresh()
+            ttk.Button(card, text="Развернуть кампанию-70 · с резервной копией", command=replan).pack(anchor="w", pady=8)
+        ui_text(card, app, f"Сегодня: {sysm.day_type(today)} · норма {fmt_h(sysm.day_plan(today))} ч", font="ui").pack(anchor="w", pady=8)
+        for label, command in [("Построение / главный удар", app.coach.open_morning),
+                               ("Вечерняя сводка", app.checkin),
+                               ("Изменить нормы и правила", lambda: self.set_tab("plan"))]:
+            ttk.Button(card, text=label, command=command).pack(anchor="w", pady=3)
+        outer, card = ui_card(self.body, app)
+        outer.pack(fill="x")
+        ui_text(card, app, "Осмотр готовности · личный чек-лист", font="h2").pack(anchor="w")
+        ui_text(card, app, "Отметки сохраняются на каждый день. Это осмотр, не дополнительные штрафы.").pack(fill="x")
+        records = cfg.setdefault("checks", {})
+        if not isinstance(records.get(today.isoformat()), dict):
+            records[today.isoformat()] = {}
+        checks = records[today.isoformat()]
+        for key, label in SOLDIER_CHECKS:
+            var = tk.BooleanVar(value=bool(checks.get(key)))
+            def toggle(k=key, v=var):
+                checks[k] = v.get()
+                app.store.save()
+            ttk.Checkbutton(card, text=label, variable=var, command=toggle).pack(anchor="w", pady=5)
 
     def _app_alerts(self):
         """Сигналы о самой программе: без автозапуска дежурный после перезагрузки молчит."""
@@ -19972,7 +20047,7 @@ class SystemView(tk.Frame):
             if d <= today:
                 f += sysm.hours_on(d)
                 fact_cum.append(f)
-        goal = sysm.goal("hours", 750)
+        goal = sysm.goal("hours", 630)
         fc = sysm.forecast(today)
         top = max(goal, p, fc.get("q90") or 0, f, 1.0) * 1.06
         left, right, top_pad, bottom = px(44), px(56), px(10), px(20)
@@ -26483,13 +26558,13 @@ class App(tk.Tk):
         out = [f"# Генштаб: пакет для разбора — {title}", "",
                f"Я веду личную кампанию в программе «Генштаб»: {sysm.name()}, {sysm.total_days()} "
                f"{plural(sysm.total_days(), DAY_FORMS)} ({sysm.start():%d.%m}–{sysm.end():%d.%m.%Y}), "
-               f"цель — {int(sysm.goal('hours', 750))} сфокусированных часов, оценки не ниже "
+               f"цель — {int(sysm.goal('hours', 630))} сфокусированных часов, оценки не ниже "
                f"{fmt_h(g.get('grade_min'))} и в среднем {fmt_h(g.get('grade_avg'))}, тренировки "
                f"{fmt_h(g.get('trainings'))} в неделю, сон от {fmt_h(g.get('sleep'))} ч, подъём {g.get('wake')}. "
                "Ниже — факты из программы. Разбери их жёстко и по делу.", "",
                "## Положение", "",
                f"- {sysm.campaign_line(today)}; этап «{(sysm.phase_at(min(max(today, sysm.start()), sysm.end())) or {}).get('name', '—')}»",
-               f"- часы в кампании: {fmt_h(sysm.hours_total())} из {int(sysm.goal('hours', 750))}",
+               f"- часы в кампании: {fmt_h(sysm.hours_total())} из {int(sysm.goal('hours', 630))}",
                f"- звание: {r['name']}, опыт {r['xp']} (штрафы −{r['pen']}" + (f", выслуга {r['carry']}" if r["carry"] else "")
                + ")",
                f"- резерв: {sysm.reserve_left(today)} из {sysm.reserve_total(today)}; нарядов открыто "
